@@ -22,15 +22,12 @@ public class App {
 
 
     public static void main(String[] args) throws IOException {
-        String[] packages = new String[] {"org.bukkit", "net.kyori", "com.google.common"};
+        String[] packages = new String[] {"org.bukkit", "net.md_5", "io.papermc"};
         HashMap<String, Object> parsed_packages = new HashMap<>();
 
         for(String pkg : packages) {
-            System.out.println(pkg);
             parsed_packages.put(pkg, packageMap(pkg));
         }
-
-
         
         File dest_file = new File("../../spigot.json");
         dest_file.createNewFile();
@@ -43,10 +40,33 @@ public class App {
 
     public static HashMap<String,HashMap<String,Object>> packageMap(String packageName) {
         Reflections reflections = new Reflections(packageName, new SubTypesScanner(false));
-        Set<Class<? extends Object>> objects = reflections.getSubTypesOf(Object.class)
-            .stream()
-            .collect(Collectors.toSet());
+        HashMap<String, HashMap<String,Object>> all = new HashMap<>();
 
+        // =======
+        // CLASSES
+        // =======
+        ArrayList<ParsedClass> classes = new ArrayList<ParsedClass>();
+        for(Class<? extends Object> cls : reflections.getSubTypesOf(Object.class)) {
+            classes.add(new ParsedClass(cls));
+        }
+
+        HashMap<String, ParsedClass> classes_part_2 = new HashMap<>();
+
+        classes.forEach(c -> {
+            classes_part_2.put(c.name, c);
+        });
+
+        classes_part_2.keySet().forEach(c -> {
+            ParsedClass cls = classes_part_2.get(c);
+            if(all.get(cls.packageName) == null) {
+                all.put(cls.packageName, new HashMap<>());
+            }
+            all.get(cls.packageName).put(c, cls);
+        });
+
+        // =======
+        // ENUMS
+        // =======
         ArrayList<Enum<?>> enum_objects = new ArrayList<>();
         for(Class<?> e : reflections.getSubTypesOf(Enum.class)) {
             try {
@@ -68,26 +88,6 @@ public class App {
             }
         };
 
-        ArrayList<ParsedClass> classes = new ArrayList<ParsedClass>();
-        for(Class<? extends Object> cls : objects) {
-            classes.add(new ParsedClass(cls));
-        }
-
-        HashMap<String, HashMap<String,Object>> all = new HashMap<>();
-
-        HashMap<String, ParsedClass> classes_part_2 = new HashMap<>();
-
-        classes.forEach(c -> {
-            classes_part_2.put(c.name, c);
-        });
-
-        classes_part_2.keySet().forEach(c -> {
-            ParsedClass cls = classes_part_2.get(c);
-            if(all.get(cls.packageName) == null) {
-                all.put(cls.packageName, new HashMap<>());
-            }
-            all.get(cls.packageName).put(c, cls);
-        });
 
         ArrayList<ParsedEnum> enums = new ArrayList<ParsedEnum>();
         for(Enum<?> e : enum_objects) {

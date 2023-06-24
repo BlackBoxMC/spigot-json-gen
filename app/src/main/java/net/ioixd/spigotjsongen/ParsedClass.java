@@ -11,11 +11,11 @@ public class ParsedClass {
     public String packageName;
 
 
-    public ArrayList<String> classes;
+    public ArrayList<ParsedClass> classes;
     public ArrayList<ParsedConstructor> constructors;
     public HashMap<String,String> fields;
     public ArrayList<ParsedMethod> methods;
-    public ArrayList<String> interfaces;
+    public ArrayList<ParsedClass> interfaces;
 
     //public @Nullable ArrayList<Annotation> annotations;
     public ArrayList<Object> enums;
@@ -24,15 +24,21 @@ public class ParsedClass {
     public int modifiers;
 
     public boolean isEnum = false;
+    public boolean isInterface = false;
 
     ParsedClass(Class<?> cls) {
         this.packageName = cls.getPackageName();
         this.name = cls.getName().replace(this.packageName+".","");
+        this.isInterface = cls.isInterface();
 
-        if(cls.getClasses().length >= 1) {
-            this.classes = new ArrayList<String>();
-            for(Class<?> cl : cls.getClasses()) {
-                this.classes.add(cl.getName());
+        if(cls.getDeclaredClasses().length >= 1) {
+            this.classes = new ArrayList<ParsedClass>();
+            for(Class<?> cl : cls.getDeclaredClasses()) {
+                if(cl.getPackageName().startsWith("java")) {
+                    // hell naw
+                    continue;
+                }
+                this.classes.add(new ParsedClass(cl));
             }
         }
         if(cls.getConstructors().length >= 1) {
@@ -41,22 +47,27 @@ public class ParsedClass {
                 this.constructors.add(new ParsedConstructor(c));
             }
         }
-        if(cls.getFields().length >= 1) {
+        if(cls.getDeclaredFields().length >= 1) {
             this.fields = new HashMap<>();
-            for(Field f: cls.getFields()) {
+            for(Field f: cls.getDeclaredFields()) {
                 this.fields.put(f.getName(), f.getType().getName());
             }
         }
-        if(cls.getMethods().length >= 1) {
+        if(cls.getDeclaredMethods().length >= 1) {
             this.methods = new ArrayList<ParsedMethod>();
-            for(Method m : cls.getMethods()) {
+            for(Method m : cls.getDeclaredMethods()) {
                 this.methods.add(new ParsedMethod(m));
             }
         }
         if(cls.getInterfaces().length >= 1) {
-            this.interfaces = new ArrayList<String>();
+            this.interfaces = new ArrayList<ParsedClass>();
             for(Class<?> i : cls.getInterfaces()) {
-                this.interfaces.add(i.getName());
+                if(cls.getDeclaringClass() != null) {
+                    if(cls.getDeclaringClass().getName() == i.getName()) {
+                        continue;
+                    }
+                }
+                this.interfaces.add(new ParsedClass(i));
             }
         }
 

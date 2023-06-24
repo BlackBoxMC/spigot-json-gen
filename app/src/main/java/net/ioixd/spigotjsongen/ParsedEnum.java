@@ -7,6 +7,7 @@ public class ParsedEnum {
     public String packageName;
     public ArrayList<String> values = new ArrayList<String>();
     public int ordinal;
+    public ArrayList<ParsedClass> classes;
 
     public boolean isEnum = true;
     ParsedEnum(Enum<?> e) {
@@ -20,5 +21,16 @@ public class ParsedEnum {
             };
         }
         this.ordinal = e.ordinal();
+
+        if(e.getClass().getClasses().length >= 1) {
+            this.classes = new ArrayList<ParsedClass>();
+            for(Class<?> cl : e.getClass().getClasses()) {
+                if(cl.getPackageName().startsWith("java")) {
+                    // hell naw
+                    continue;
+                }
+                this.classes.add(new ParsedClass(cl));
+            }
+        }
     }
 }
