@@ -9,9 +9,8 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
@@ -19,16 +18,36 @@ import org.reflections.scanners.SubTypesScanner;
 import com.google.gson.Gson;
 
 public class App {
-
-
     public static void main(String[] args) throws IOException {
-        String[] packages = new String[] {"org.bukkit", "net.md_5", "io.papermc"};
+        String[][] packages = new String[][] {
+            {"org.bukkit",
+                    "org.bukkit.StructureType",
+                    "org.bukkit.World$Environment",
+                    "org.bukkit.BanList$Type",
+                    "org.bukkit.plugin.ServicePriority",
+                    "org.bukkit.entity.EnderDragon$Phase",
+                    "org.bukkit.conversations.ConversationAbandonedEvent",
+                    "org.bukkit.command.Command",
+                    "org.bukkit.ChatColor",
+                    "org.bukkit.enchantments.EnchantmentTarget",
+                    "org.bukkit.entity.Spellcaster$Spell",
+                    "org.bukkit.block.Lectern",
+                    "org.bukkit.Warning$WarningState",
+                    "org.bukkit.material.Directional",
+            },
+            {"net.md_5",
+                    "net.md_5.bungee.chat.TranslationRegistry$TranslationProvider"}
+        };
         HashMap<String, Object> parsed_packages = new HashMap<>();
 
-        for(String pkg : packages) {
-            parsed_packages.put(pkg, packageMap(pkg));
+        for(String[] pkg : packages) {
+            String[] oh = new String[] {};
+            if(pkg.length >= 1) {
+                oh = Arrays.copyOfRange(pkg, 1, pkg.length);
+            }
+            parsed_packages.put(pkg[0], packageMap(pkg[0], oh));
         }
-        
+
         File dest_file = new File("../../spigot.json");
         dest_file.createNewFile();
 
@@ -38,7 +57,7 @@ public class App {
         dest.close();
     }
 
-    public static HashMap<String,HashMap<String,Object>> packageMap(String packageName) {
+    public static HashMap<String,HashMap<String,Object>> packageMap(String packageName, String[] lostImports) {
         Reflections reflections = new Reflections(packageName, new SubTypesScanner(false));
         HashMap<String, HashMap<String,Object>> all = new HashMap<>();
 
@@ -48,6 +67,18 @@ public class App {
         ArrayList<ParsedClass> classes = new ArrayList<ParsedClass>();
         for(Class<? extends Object> cls : reflections.getSubTypesOf(Object.class)) {
             classes.add(new ParsedClass(cls));
+        }
+
+        for (String importStr : lostImports) {
+            Class<?> what;
+            try {
+                what = Class.forName(importStr);
+                classes.add(new ParsedClass(what));
+            } catch (ClassNotFoundException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                System.exit(1);
+            }
         }
 
         HashMap<String, ParsedClass> classes_part_2 = new HashMap<>();

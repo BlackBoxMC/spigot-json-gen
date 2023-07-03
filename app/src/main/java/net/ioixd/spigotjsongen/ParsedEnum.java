@@ -1,5 +1,6 @@
 package net.ioixd.spigotjsongen;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 
 public class ParsedEnum {
@@ -8,6 +9,7 @@ public class ParsedEnum {
     public ArrayList<String> values = new ArrayList<String>();
     public int ordinal;
     public ArrayList<ParsedClass> classes;
+    public ArrayList<ParsedMethod> methods;
 
     public boolean isEnum = true;
     ParsedEnum(Enum<?> e) {
@@ -21,6 +23,13 @@ public class ParsedEnum {
             };
         }
         this.ordinal = e.ordinal();
+
+        if(e.getClass().getDeclaredMethods().length >= 1) {
+            this.methods = new ArrayList<ParsedMethod>();
+            for(Method m : e.getClass().getDeclaredMethods()) {
+                this.methods.add(new ParsedMethod(m));
+            }
+        }
 
         if(e.getClass().getClasses().length >= 1) {
             this.classes = new ArrayList<ParsedClass>();

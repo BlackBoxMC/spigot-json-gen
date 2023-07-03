@@ -14,6 +14,8 @@ public class ParsedMethod {
     public ArrayList<String[]> parameters = new ArrayList<String[]>();
     public ArrayList<String> typeParameters = new ArrayList<String>();
 
+    public String genericReturnType;
+
     public String returnType;
 
     public ParsedMethod(Method method) {
@@ -28,7 +30,9 @@ public class ParsedMethod {
             return f.getTypeName();
         }).collect(Collectors.toList());
         this.modifiers = method.getModifiers();
-        
+
+        this.genericReturnType = method.getGenericReturnType().getTypeName();
+
         this.parameters = (ArrayList<String[]>) new ArrayList<>(Arrays.asList(method.getParameters())).stream().map(f -> {
             return new String[] {f.getName(), f.getType().getTypeName()};
         }).collect(Collectors.toList());
