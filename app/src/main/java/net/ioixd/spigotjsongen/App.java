@@ -34,6 +34,7 @@ public class App {
                     "org.bukkit.block.Lectern",
                     "org.bukkit.Warning$WarningState",
                     "org.bukkit.material.Directional",
+                    "org.bukkit.material.Openable",
             },
             {"net.md_5",
                     "net.md_5.bungee.chat.TranslationRegistry$TranslationProvider"}
@@ -48,10 +49,10 @@ public class App {
             parsed_packages.put(pkg[0], packageMap(pkg[0], oh));
         }
 
-        File dest_file = new File("../../spigot.json");
+        File dest_file = new File("../spigot.json");
         dest_file.createNewFile();
 
-        FileWriter dest = new FileWriter("../../spigot.json");
+        FileWriter dest = new FileWriter("../spigot.json");
         String json = new Gson().toJson(parsed_packages);
         dest.write(json, 0, json.length());
         dest.close();
