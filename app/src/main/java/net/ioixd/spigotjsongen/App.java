@@ -18,10 +18,6 @@ import org.reflections.scanners.SubTypesScanner;
 
 import com.google.gson.Gson;
 
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.ClassInfoList;
-import io.github.classgraph.ScanResult;
-
 public class App {
     public static void main(String[] args) throws IOException {
         String[][] packages = new String[][] {
@@ -122,70 +118,16 @@ public class App {
     }
 
     public static HashMap<String,HashMap<String,Object>> packageMap(String packageName, String[] lostImports) {
-        ClassGraph clsgraph = new ClassGraph();
-        clsgraph.acceptPackages(packageName);
-        clsgraph.initializeLoadedClasses();
-        ScanResult scan = clsgraph.scan();
-
+        Reflections reflections = new Reflections(packageName, new SubTypesScanner(false));
         HashMap<String, HashMap<String,Object>> all = new HashMap<>();
 
-        // Reflections actually sucks but so does ClassGraph, it just sucks less, so we need to use this as a fallback
-        Reflections reflections = new Reflections(packageName, new SubTypesScanner(false));
-        HashMap<String, Class<? extends Object>> reflectionsmap = new HashMap<>();
-        HashMap<String, Enum<?>> enummap = new HashMap<>();
+        // =======
+        // CLASSES
+        // =======
+        ArrayList<ParsedClass> classes = new ArrayList<ParsedClass>();
         for(Class<? extends Object> cls : reflections.getSubTypesOf(Object.class)) {
-            reflectionsmap.put(cls.getName(), cls);
+            classes.add(new ParsedClass(cls));
         }
-
-        // ============================
-        // CLASSES AND INTERFACES
-        // ============================
-        ArrayList<ParsedClass> classes = new ArrayList<ParsedClass>(); 
-        ClassInfoList classes_raw = scan.getAllClasses();
-        classes_raw.forEach(cls -> {
-            cls.loadClass(true);
-        });
-        classes_raw.forEach(cls -> {
-            Class<?> c = cls.loadClass(true);
-            if(c == null) {
-                try {
-                    cls.loadClass(false);
-                } catch(Exception ex) {
-                    try {
-                        // try loading it through Reflections instead.
-                        classes.add(new ParsedClass(reflectionsmap.get(cls.getName())));
-                        return;
-                    } catch(Exception ex2) {
-                        ex.printStackTrace();
-                        System.out.println("An additional error occured when trying to use Reflections:");
-                        ex2.printStackTrace();
-                        return;
-                    }
-                }
-            }
-            classes.add(new ParsedClass(c));
-        });
-        ClassInfoList interfaces = scan.getAllInterfaces();
-        interfaces.forEach(cls -> {
-            Class<?> c = cls.loadClass(true);
-            if(c == null) {
-                try {
-                    cls.loadClass(false);
-                } catch(Exception ex) {
-                    try {
-                        // try loading it through Reflections instead.
-                        classes.add(new ParsedClass(reflectionsmap.get(cls.getName())));
-                        return;
-                    } catch(Exception ex2) {
-                        ex.printStackTrace();
-                        System.out.println("An additional error occured when trying to use Reflections:");
-                        ex2.printStackTrace();
-                        return;
-                    }
-                }
-            }
-            classes.add(new ParsedClass(c));
-        });
 
         for (String importStr : lostImports) {
             Class<?> what;
@@ -193,6 +135,7 @@ public class App {
                 what = Class.forName(importStr);
                 classes.add(new ParsedClass(what));
             } catch (ClassNotFoundException e) {
+                // TODO Auto-generated catch block
                 e.printStackTrace();
                 System.exit(1);
             }
@@ -211,29 +154,16 @@ public class App {
             }
             all.get(cls.packageName).put(c, cls);
         });
-        
-        // ============================
+
+        // =======
         // ENUMS
-        // ============================
+        // =======
         ArrayList<Enum<?>> enum_objects = new ArrayList<>();
-        ClassInfoList enums_raw = scan.getSubclasses(Enum.class.getName());
-        enums_raw.getEnums().forEach(en -> {
-            Class<?> e = en.loadClass(true);
-            if(e == null) {
-                try {
-                    en.loadClass(false);
-                } catch(Exception ex) {
-                    try {
-                        enum_objects.add(enummap.get(en.getName()));
-                    } catch(Exception ex2) {
-                        ex.printStackTrace();
-                        System.out.println("An additional error occured when trying to use Reflections:");
-                        ex2.printStackTrace();
-                        return;
-                    }
-                }
-            }
+        for(Class<?> e : reflections.getSubTypesOf(Enum.class)) {
             try {
+                if(e.getName().contains("$")) {
+                    continue;
+                }
                 Method valueOf = e.getDeclaredMethod("valueOf", String.class);
                 String value = e.getEnumConstants()[0].toString();
                 if(value.toUpperCase() != value) {
@@ -247,7 +177,7 @@ public class App {
                 System.out.println(value);
                 e1.printStackTrace();
             }
-        });
+        };
 
 
         ArrayList<ParsedEnum> enums = new ArrayList<ParsedEnum>();
