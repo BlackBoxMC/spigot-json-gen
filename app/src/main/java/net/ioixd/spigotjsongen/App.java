@@ -6,13 +6,13 @@ package net.ioixd.spigotjsongen;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 
-import org.bukkit.event.Event;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
 
@@ -21,88 +21,98 @@ import com.google.gson.Gson;
 public class App {
     public static void main(String[] args) throws IOException {
         String[][] packages = new String[][] {
-            {"org.bukkit",
-                    "org.bukkit.StructureType",
-                    "org.bukkit.World$Environment",
-                    "org.bukkit.BanList$Type",
-                    "org.bukkit.plugin.ServicePriority",
-                    "org.bukkit.entity.EnderDragon$Phase",
-                    "org.bukkit.conversations.ConversationAbandonedEvent",
-                    "org.bukkit.command.Command",
-                    "org.bukkit.ChatColor",
-                    "org.bukkit.enchantments.EnchantmentTarget",
-                    "org.bukkit.entity.Spellcaster$Spell",
-                    "org.bukkit.block.Lectern",
-                    "org.bukkit.Warning$WarningState",
-                    "org.bukkit.material.Directional",
-                    "org.bukkit.material.Openable",
-                    "org.bukkit.block.data.Directional",
-                    "org.bukkit.entity.Damageable",
-                    "org.bukkit.block.data.Ageable",
-                    "org.bukkit.block.data.type.Sapling",
-                    "org.bukkit.block.Furnace",
-                    "org.bukkit.block.SculkSensor",
-                    "org.bukkit.block.Sign",
-                    "org.bukkit.structure.Structure",
-                    "org.bukkit.block.data.type.StructureBlock$Mode",
-                    "org.bukkit.packs.DataPack$Compatibility",
-                    "org.bukkit.packs.DataPack$Source",
-                    "org.bukkit.profile.PlayerTextures$SkinModel",
-                    "org.bukkit.scoreboard.Team$Option",
-                    "org.bukkit.scoreboard.Team$OptionStatus",
-                    "org.bukkit.block.data.type.TechnicalPiston$Type",
-                    "org.bukkit.block.data.type.Switch$Face",
-                    "org.bukkit.block.data.type.Bamboo$Leaves",
-                    "org.bukkit.block.data.type.Jigsaw$Orientation",
-                    "org.bukkit.block.data.type.Wall$Height",
-                    "org.bukkit.block.data.type.BigDripleaf$Tilt",
-                    "org.bukkit.block.data.type.PointedDripstone$Thickness",
-                    "org.bukkit.block.data.type.Slab$Type",
-                    "org.bukkit.block.data.FaceAttachable$AttachedFace",
-                    "org.bukkit.block.data.Rail$Shape",
-                    "org.bukkit.block.data.Bisected$Half",
-                    "org.bukkit.boss.DragonBattle$RespawnPhase",
-                    "org.bukkit.entity.Ageable",
-                    "org.bukkit.entity.MushroomCow$Variant",
-                    "org.bukkit.entity.Panda$Gene",
-                    "org.bukkit.entity.ItemDisplay$ItemDisplayTransform",
-                    "org.bukkit.entity.AbstractArrow$PickupStatus",
-                    "org.bukkit.entity.Skeleton$SkeletonType",
-                    "org.bukkit.entity.Warden$AngerLevel",
-                    "org.bukkit.entity.Rabbit$Type",
-                    "org.bukkit.entity.TextDisplay$TextAlignment",
-                    "org.bukkit.entity.TropicalFish$Pattern",
-                    "org.bukkit.entity.Wither$Head",
-                    "org.bukkit.entity.Llama$Color",
-                    "org.bukkit.entity.Boat$Status",
-                    "org.bukkit.entity.Boat$Type",
-                    "org.bukkit.entity.Display$Billboard",
-                    "org.bukkit.entity.Horse$Variant",
-                    "org.bukkit.entity.Horse$Color",
-                    "org.bukkit.entity.Horse$Style",
-                    "org.bukkit.entity.FishHook$HookState",
-                    "org.bukkit.entity.Parrot$Variant",
-                    "org.bukkit.entity.Evoker$Spell",
-                    "org.bukkit.entity.Fox$Type",
-                    "org.bukkit.entity.Ocelot$Type",
-                    "org.bukkit.entity.Cat$Type",
-                    "org.bukkit.entity.Axolotl$Variant", 
-                    "org.bukkit.entity.ArmorStand$LockType",
-                    "org.bukkit.entity.Sniffer$State",
-                    "org.bukkit.Chunk$LoadLevel",
-                    "org.bukkit.Raid$RaidStatus",
-                    "org.bukkit.map.MapView$Scale",
-                    "org.bukkit.block.Jukebox",
-                    "org.bukkit.inventory.meta.BookMeta$Generation"
-            },
-            {"net.md_5",
-                    "net.md_5.bungee.chat.TranslationRegistry$TranslationProvider"}
+                { "org.bukkit",
+                        "org.bukkit.StructureType",
+                        "org.bukkit.World$Environment",
+                        "org.bukkit.BanList$Type",
+                        "org.bukkit.plugin.ServicePriority",
+                        "org.bukkit.entity.EnderDragon$Phase",
+                        "org.bukkit.conversations.ConversationAbandonedEvent",
+                        "org.bukkit.command.Command",
+                        "org.bukkit.ChatColor",
+                        "org.bukkit.enchantments.EnchantmentTarget",
+                        "org.bukkit.entity.Spellcaster$Spell",
+                        "org.bukkit.block.Lectern",
+                        "org.bukkit.Warning$WarningState",
+                        "org.bukkit.material.Directional",
+                        "org.bukkit.material.Openable",
+                        "org.bukkit.block.data.Directional",
+                        "org.bukkit.entity.Damageable",
+                        "org.bukkit.block.data.Ageable",
+                        "org.bukkit.block.data.type.Sapling",
+                        "org.bukkit.block.Furnace",
+                        "org.bukkit.block.SculkSensor",
+                        "org.bukkit.block.Sign",
+                        "org.bukkit.structure.Structure",
+                        "org.bukkit.block.data.type.StructureBlock$Mode",
+                        "org.bukkit.packs.DataPack$Compatibility",
+                        "org.bukkit.packs.DataPack$Source",
+                        "org.bukkit.profile.PlayerTextures$SkinModel",
+                        "org.bukkit.scoreboard.Team$Option",
+                        "org.bukkit.scoreboard.Team$OptionStatus",
+                        "org.bukkit.block.data.type.TechnicalPiston$Type",
+                        "org.bukkit.block.data.type.Switch$Face",
+                        "org.bukkit.block.data.type.Bamboo$Leaves",
+                        "org.bukkit.block.data.type.Jigsaw$Orientation",
+                        "org.bukkit.block.data.type.Wall$Height",
+                        "org.bukkit.block.data.type.BigDripleaf$Tilt",
+                        "org.bukkit.block.data.type.PointedDripstone$Thickness",
+                        "org.bukkit.block.data.type.Slab$Type",
+                        "org.bukkit.block.data.FaceAttachable$AttachedFace",
+                        "org.bukkit.block.data.Rail$Shape",
+                        "org.bukkit.block.data.Bisected$Half",
+                        "org.bukkit.block.data.type.Comparator$Mode",
+                        "org.bukkit.block.data.type.Bell$Attachment",
+                        "org.bukkit.block.data.type.Stairs$Shape",
+                        "org.bukkit.block.data.type.SculkSensor$Phase",
+                        "org.bukkit.block.data.type.RedstoneWire$Connection",
+                        "org.bukkit.block.data.type.Bed$Part",
+                        "org.bukkit.block.data.type.Door$Hinge",
+                        "org.bukkit.boss.DragonBattle$RespawnPhase",
+                        "org.bukkit.entity.Ageable",
+                        "org.bukkit.entity.MushroomCow$Variant",
+                        "org.bukkit.entity.Panda$Gene",
+                        "org.bukkit.entity.ItemDisplay$ItemDisplayTransform",
+                        "org.bukkit.entity.AbstractArrow$PickupStatus",
+                        "org.bukkit.entity.Skeleton$SkeletonType",
+                        "org.bukkit.entity.Warden$AngerLevel",
+                        "org.bukkit.entity.Rabbit$Type",
+                        "org.bukkit.entity.TextDisplay$TextAlignment",
+                        "org.bukkit.entity.TropicalFish$Pattern",
+                        "org.bukkit.entity.Wither$Head",
+                        "org.bukkit.entity.Llama$Color",
+                        "org.bukkit.entity.Boat$Status",
+                        "org.bukkit.entity.Boat$Type",
+                        "org.bukkit.entity.Display$Billboard",
+                        "org.bukkit.entity.Horse$Variant",
+                        "org.bukkit.entity.Horse$Color",
+                        "org.bukkit.entity.Horse$Style",
+                        "org.bukkit.entity.FishHook$HookState",
+                        "org.bukkit.entity.Parrot$Variant",
+                        "org.bukkit.entity.Evoker$Spell",
+                        "org.bukkit.entity.Fox$Type",
+                        "org.bukkit.entity.Ocelot$Type",
+                        "org.bukkit.entity.Cat$Type",
+                        "org.bukkit.entity.Axolotl$Variant",
+                        "org.bukkit.entity.ArmorStand$LockType",
+                        "org.bukkit.entity.Sniffer$State",
+                        "org.bukkit.Chunk$LoadLevel",
+                        "org.bukkit.Raid$RaidStatus",
+                        "org.bukkit.map.MapView$Scale",
+                        "org.bukkit.block.Jukebox",
+                        "org.bukkit.inventory.meta.BookMeta$Generation",
+                        "org.bukkit.block.data.type.Chest$Type",
+                        "org.bukkit.block.DecoratedPot$Side"
+                },
+                { "net.md_5",
+                        "net.md_5.bungee.chat.TranslationRegistry$TranslationProvider" },
+                { "java.util" }
         };
         HashMap<String, Object> parsed_packages = new HashMap<>();
 
-        for(String[] pkg : packages) {
+        for (String[] pkg : packages) {
             String[] oh = new String[] {};
-            if(pkg.length >= 1) {
+            if (pkg.length >= 1) {
                 oh = Arrays.copyOfRange(pkg, 1, pkg.length);
             }
             parsed_packages.put(pkg[0], packageMap(pkg[0], oh));
@@ -117,15 +127,15 @@ public class App {
         dest.close();
     }
 
-    public static HashMap<String,HashMap<String,Object>> packageMap(String packageName, String[] lostImports) {
+    public static HashMap<String, HashMap<String, Object>> packageMap(String packageName, String[] lostImports) {
         Reflections reflections = new Reflections(packageName, new SubTypesScanner(false));
-        HashMap<String, HashMap<String,Object>> all = new HashMap<>();
+        HashMap<String, HashMap<String, Object>> all = new HashMap<>();
 
         // =======
         // CLASSES
         // =======
         ArrayList<ParsedClass> classes = new ArrayList<ParsedClass>();
-        for(Class<? extends Object> cls : reflections.getSubTypesOf(Object.class)) {
+        for (Class<? extends Object> cls : reflections.getSubTypesOf(Object.class)) {
             classes.add(new ParsedClass(cls));
         }
 
@@ -135,7 +145,6 @@ public class App {
                 what = Class.forName(importStr);
                 classes.add(new ParsedClass(what));
             } catch (ClassNotFoundException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
                 System.exit(1);
             }
@@ -144,44 +153,46 @@ public class App {
         HashMap<String, ParsedClass> classes_part_2 = new HashMap<>();
 
         classes.forEach(c -> {
-            classes_part_2.put(c.name, c);
+            System.out.println("classes " + c.packageName + "." + c.name);
+            classes_part_2.put(c.packageName + "." + c.name, c);
         });
 
         classes_part_2.keySet().forEach(c -> {
             ParsedClass cls = classes_part_2.get(c);
-            if(all.get(cls.packageName) == null) {
+            if (all.get(cls.packageName) == null) {
                 all.put(cls.packageName, new HashMap<>());
             }
-            all.get(cls.packageName).put(c, cls);
+            System.out.println("classes_part_2 " + cls.packageName + "." + cls.name);
+            all.get(cls.packageName).put(c.replace(cls.packageName + ".", ""), cls);
         });
 
         // =======
         // ENUMS
         // =======
         ArrayList<Enum<?>> enum_objects = new ArrayList<>();
-        for(Class<?> e : reflections.getSubTypesOf(Enum.class)) {
+        for (Class<?> e : reflections.getSubTypesOf(Enum.class)) {
             try {
-                if(e.getName().contains("$")) {
+                if (e.getName().contains("$")) {
                     continue;
                 }
                 Method valueOf = e.getDeclaredMethod("valueOf", String.class);
                 String value = e.getEnumConstants()[0].toString();
-                if(value.toUpperCase() != value) {
+                if (value.toUpperCase() != value) {
                     value = value.replaceAll("([A-Z])", "_$1").toUpperCase();
                 }
                 enum_objects.add((Enum<?>) valueOf.invoke(null, value));
-            } catch(InvocationTargetException ignored) {
+            } catch (InvocationTargetException ignored) {
             } catch (IllegalAccessException | IllegalArgumentException
                     | NoSuchMethodException | SecurityException e1) {
                 String value = e.getEnumConstants()[0].toString();
                 System.out.println(value);
                 e1.printStackTrace();
             }
-        };
-
+        }
+        ;
 
         ArrayList<ParsedEnum> enums = new ArrayList<ParsedEnum>();
-        for(Enum<?> e : enum_objects) {
+        for (Enum<?> e : enum_objects) {
             enums.add(new ParsedEnum(e));
         }
 
@@ -193,12 +204,32 @@ public class App {
 
         enums_part_2.keySet().forEach(c -> {
             ParsedEnum e = enums_part_2.get(c);
-            if(all.get(e.packageName) == null) {
+            if (all.get(e.packageName) == null) {
                 all.put(e.packageName, new HashMap<>());
             }
             all.get(e.packageName).put(c, e);
         });
 
         return all;
+    }
+
+    public static ArrayList<String> getAnnotations(Class<?> cls) {
+        ArrayList<String> ok = new ArrayList<>();
+        for (Annotation annotation : cls.getAnnotations()) {
+            Class<? extends Annotation> type = annotation.annotationType();
+            System.out.println("Values of " + type.getName());
+
+            for (Method method : type.getDeclaredMethods()) {
+                Object value;
+                try {
+                    value = method.invoke(annotation, (Object[]) null);
+                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                    e.printStackTrace();
+                    return null;
+                }
+                ok.add(value.toString());
+            }
+        }
+        return ok;
     }
 }
