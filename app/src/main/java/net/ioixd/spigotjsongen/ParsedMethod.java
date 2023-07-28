@@ -26,7 +26,7 @@ public class ParsedMethod {
 
     public String returnType;
 
-    public ParsedMethod(Method method) {
+    public ParsedMethod(Method method, String doclink) {
         this.name = method.getName();
         this.exceptionTypes = (ArrayList<String>) new ArrayList<>(Arrays.asList(method.getExceptionTypes())).stream()
                 .map(f -> {

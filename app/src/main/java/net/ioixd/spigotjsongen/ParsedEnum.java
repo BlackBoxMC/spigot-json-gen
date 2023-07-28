@@ -3,6 +3,7 @@ package net.ioixd.spigotjsongen;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -17,7 +18,7 @@ public class ParsedEnum {
 
     public boolean isEnum = true;
 
-    ParsedEnum(Enum<?> e) {
+    ParsedEnum(Enum<?> e, String doclink, String packageName, WebScraper webScraper) {
         this.name = e.getClass().getSimpleName();
         this.packageName = e.getClass().getPackageName();
 
@@ -53,7 +54,7 @@ public class ParsedEnum {
         if (e.getClass().getDeclaredMethods().length >= 1) {
             this.methods = new ArrayList<ParsedMethod>();
             for (Method m : e.getClass().getDeclaredMethods()) {
-                this.methods.add(new ParsedMethod(m));
+                this.methods.add(new ParsedMethod(m, doclink));
             }
         }
 
@@ -64,7 +65,10 @@ public class ParsedEnum {
                     // hell naw
                     continue;
                 }
-                this.classes.add(new ParsedClass(cl));
+                if ((cl.getModifiers() & Modifier.PUBLIC) != Modifier.PUBLIC) {
+                    continue;
+                }
+                this.classes.add(new ParsedClass(cl, doclink, packageName, webScraper));
             }
         }
     }

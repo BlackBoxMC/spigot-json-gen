@@ -1,12 +1,25 @@
 package net.ioixd.spigotjsongen;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Vector;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 public class ParsedClass {
+    public String[] generics;
     public String name;
     public String packageName;
 
@@ -29,13 +42,13 @@ public class ParsedClass {
     public ArrayList<String> returnAnnotations = new ArrayList<String>();
     public ArrayList<String> annotations = new ArrayList<String>();
 
-    ParsedClass(Class<?> cls) {
+    ParsedClass(Class<?> cls, String doclink, String packageName, WebScraper webScraper) {
         this.packageName = cls.getPackageName();
         this.name = cls.getName().replace(this.packageName + ".", "");
         this.isInterface = cls.isInterface();
 
         if (cls.getSuperclass() != null) {
-            this.superClass = new ParsedClass(cls.getSuperclass());
+            this.superClass = new ParsedClass(cls.getSuperclass(), doclink, packageName, webScraper);
         }
 
         if (cls.getDeclaredClasses().length >= 1) {
@@ -45,13 +58,13 @@ public class ParsedClass {
                     // hell naw
                     continue;
                 }
-                this.classes.add(new ParsedClass(cl));
+                this.classes.add(new ParsedClass(cl, doclink, packageName, webScraper));
             }
         }
         if (cls.getConstructors().length >= 1) {
             this.constructors = new ArrayList<ParsedConstructor>();
             for (Constructor<?> c : cls.getConstructors()) {
-                this.constructors.add(new ParsedConstructor(c));
+                this.constructors.add(new ParsedConstructor(c, doclink));
             }
         }
         if (cls.getDeclaredFields().length >= 1) {
@@ -63,7 +76,7 @@ public class ParsedClass {
         if (cls.getMethods().length >= 1) {
             this.methods = new ArrayList<ParsedMethod>();
             for (Method m : cls.getMethods()) {
-                this.methods.add(new ParsedMethod(m));
+                this.methods.add(new ParsedMethod(m, doclink));
             }
         }
         if (cls.getInterfaces().length >= 1) {
@@ -74,7 +87,7 @@ public class ParsedClass {
                         continue;
                     }
                 }
-                this.interfaces.add(new ParsedClass(i));
+                this.interfaces.add(new ParsedClass(i, doclink, packageName, webScraper));
             }
         }
 
@@ -86,5 +99,18 @@ public class ParsedClass {
         }
 
         this.modifiers = cls.getModifiers();
+
+        // Ok time for the information that Java just doesn't fucking give us because
+        // fuck you that's why
+        if (cls.getPackageName() != packageName) {
+            return;
+        }
+        String url = doclink + cls.getName().replace(".", "/").replace("$", ".") + ".html";
+        try {
+            // Generics
+            this.generics = webScraper.getGenerics(url);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

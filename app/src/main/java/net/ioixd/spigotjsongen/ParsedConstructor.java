@@ -20,7 +20,7 @@ public class ParsedConstructor {
     public ArrayList<String> typeParameters = new ArrayList<String>();
     public ArrayList<String[]> annotations = new ArrayList<String[]>();
 
-    public ParsedConstructor(Constructor<?> constructor) {
+    public ParsedConstructor(Constructor<?> constructor, String doclink) {
         this.name = constructor.getName();
         this.exceptionTypes = (ArrayList<String>) new ArrayList<>(Arrays.asList(constructor.getExceptionTypes()))
                 .stream().map(f -> {
