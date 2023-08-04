@@ -47,16 +47,16 @@ impl Parser {
     }
     pub fn get_url<'a>(
         &self,
-        module_name: String,
+        module_name: &String,
         env: &mut JNIEnv<'a>,
         cls: JClass<'a>,
     ) -> Result<Option<Html>, Box<dyn Error>> {
         self.runtime
-            .block_on(async { self.get_url_async(module_name, env, cls).await })
+            .block_on(async { self.get_url_async(&module_name, env, cls).await })
     }
     pub async fn get_url_async<'a>(
         &self,
-        module_name: String,
+        module_name: &String,
         env: &mut JNIEnv<'a>,
         cls: JClass<'a>,
     ) -> Result<Option<Html>, Box<dyn Error>> {
@@ -105,7 +105,7 @@ impl Parser {
         if let Some(g) = parsed_generics.get(&id) {
             Ok(g.to_vec())
         } else {
-            let doc = self.get_url(module_name.clone(), env, cls).unwrap();
+            let doc = self.get_url(&module_name, env, cls).unwrap();
             if let None = doc {
                 return Ok(Vec::new());
             };
@@ -150,7 +150,7 @@ impl Parser {
         if let Some(g) = parsed_method_generics.get(&id) {
             Ok(g.to_vec())
         } else {
-            let doc = self.get_url(module_name, env, cls).unwrap();
+            let doc = self.get_url(&module_name, env, cls).unwrap();
             if let None = doc {
                 return Ok(Vec::new());
             };
@@ -246,7 +246,7 @@ pub fn call_method_return_java_array<'a>(
     ) -> Result<Vec<String>, Box<dyn Error>>,
 ) -> JObjectArray<'a> {
     let str_cls = env.find_class("java/lang/String").unwrap();
-    let mut names = f(&mut env, cls, module_name, method_name).unwrap();
+    let names = f(&mut env, cls, module_name, method_name).unwrap();
 
     let arr = env
         .new_object_array(names.len() as i32, str_cls, env.new_string("").unwrap())
