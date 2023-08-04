@@ -22,6 +22,8 @@ public class ParsedEnum {
         this.name = e.getClass().getSimpleName();
         this.packageName = e.getClass().getPackageName();
 
+        String url = doclink + e.getClass().getName().replace(".", "/").replace("$", ".") + ".html";
+
         Enum<?>[] constants = e.getClass().getEnumConstants();
         if (constants != null) {
             for (Enum<?> en : constants) {
@@ -54,7 +56,14 @@ public class ParsedEnum {
         if (e.getClass().getDeclaredMethods().length >= 1) {
             this.methods = new ArrayList<ParsedMethod>();
             for (Method m : e.getClass().getDeclaredMethods()) {
-                this.methods.add(new ParsedMethod(m, doclink));
+                String[] parts = e.getClass().getPackageName().split(".");
+                if (parts.length >= 2) {
+                    String[] fuckyou = new String[] {
+                            parts[0],
+                            parts[1]
+                    };
+                    this.methods.add(new ParsedMethod(m, e.getClass(), String.join(".", fuckyou), webScraper));
+                }
             }
         }
 

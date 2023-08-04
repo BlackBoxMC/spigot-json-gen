@@ -1,13 +1,19 @@
 plugins {
     id 'application'
+    id 'groovy'
 }
 
 group = 'net.ioixd'
 version = '1.0-SNAPSHOT'
 
+compileJava {
+    options.compilerArgs += ["-h", file("include")]
+}
+
 application {
     // Define the main class for the application.
     mainClass = 'net.ioixd.spigotjsongen.App'
+    applicationDefaultJvmArgs += "-Djava.library.path=${projectDir}/lib/"
 }
 
 repositories {
@@ -53,6 +59,8 @@ dependencies {
     implementation "org.eclipse.aether:aether-api:1.1.0"
 
     implementation 'org.jsoup:jsoup:1.16.1'
+
+    implementation 'org.codehaus.groovy:groovy-json:3.0.9'
 }
 
 def targetJavaVersion = 17
@@ -87,4 +95,50 @@ jar {
       'Main-Class': 'net.ioixd.spigotjsongen.App'
     )
   }
+}
+
+def rustBasePath = "rust"
+
+// execute cargo metadata and get path to target directory
+tasks.create(name: "cargo-output-dir", description: "Get cargo metadata") {
+    new ByteArrayOutputStream().withStream { os ->
+        exec {
+            commandLine 'cargo', 'metadata', '--format-version', '1'
+            workingDir rustBasePath
+            standardOutput = os
+        }
+        def outputAsString = os.toString()
+        def json = new groovy.json.JsonSlurper().parseText(outputAsString)
+
+        logger.info("cargo target directory: ${json.target_directory}")
+        project.ext.cargo_target_directory = json.target_directory
+    }
+}
+
+// Build with cargo
+tasks.create(name: "cargo-build", type: Exec, description: "Running Cargo build", dependsOn: "cargo-output-dir") {
+    workingDir rustBasePath
+    commandLine 'cargo', 'build', '--release'
+}
+
+tasks.create(name: "rust-deploy", type: Sync, dependsOn: "cargo-build") {
+    from "${project.ext.cargo_target_directory}/release"
+    include "*.dylib","*.so"
+    into "lib/"
+}
+
+clean.dependsOn "clean-rust"
+tasks.withType(JavaCompile) {
+    compileTask -> compileTask.dependsOn "rust-deploy"
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src/main/java'
+        }
+        resources {
+            srcDir 'rust'
+        }
+    }
 }

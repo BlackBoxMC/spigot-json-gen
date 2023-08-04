@@ -1,1 +1,4 @@
 .javadocCache
+lib
+build
+bin

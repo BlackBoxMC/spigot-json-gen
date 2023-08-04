@@ -1,5 +1,6 @@
 package net.ioixd.spigotjsongen;
 
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.InvocationTargetException;
@@ -13,6 +14,8 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.NotNull;
 
 public class ParsedMethod {
+    public String[] generics;
+
     public String name;
     public ArrayList<String> exceptionTypes = new ArrayList<String>();
     public ArrayList<String> genericExceptionTypes = new ArrayList<String>();
@@ -26,7 +29,9 @@ public class ParsedMethod {
 
     public String returnType;
 
-    public ParsedMethod(Method method, String doclink) {
+    public boolean isDefault;
+
+    public ParsedMethod(Method method, Class<?> upperClass, String upperDoclink, WebScraper webScraper) {
         this.name = method.getName();
         this.exceptionTypes = (ArrayList<String>) new ArrayList<>(Arrays.asList(method.getExceptionTypes())).stream()
                 .map(f -> {
@@ -51,6 +56,17 @@ public class ParsedMethod {
 
         this.returnType = method.getReturnType().getTypeName();
 
+        try {
+            this.generics = webScraper.getMethodGenerics(upperDoclink, upperClass,
+                    method.getName());
+            if (this.generics.length >= 1) {
+                System.out.println(upperClass.getName() + "." + this.name + ", " +
+                        Arrays.toString(this.generics));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         this.annotations = new ArrayList<>(Arrays.asList());
         for (Annotation annotation : method.getAnnotations()) {
             for (Method method_ : annotation.annotationType().getDeclaredMethods()) {
@@ -63,6 +79,8 @@ public class ParsedMethod {
                 }
             }
         }
+
+        this.isDefault = method.isDefault();
     }
 
 }

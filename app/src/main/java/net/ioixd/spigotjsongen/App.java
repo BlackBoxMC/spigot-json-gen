@@ -10,6 +10,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.concurrent.CountDownLatch;
 
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
@@ -21,51 +22,6 @@ public class App {
     public static void main(String[] args) throws IOException {
         WebScraper webScraper = new WebScraper();
         String[][] packages = new String[][] {
-                { "org.bukkit",
-                        "https://hub.spigotmc.org/javadocs/spigot/",
-                        "org.bukkit.StructureType", "org.bukkit.World$Environment", "org.bukkit.BanList$Type",
-                        "org.bukkit.plugin.ServicePriority", "org.bukkit.entity.EnderDragon$Phase",
-                        "org.bukkit.conversations.ConversationAbandonedEvent", "org.bukkit.command.Command",
-                        "org.bukkit.ChatColor", "org.bukkit.enchantments.EnchantmentTarget",
-                        "org.bukkit.entity.Spellcaster$Spell", "org.bukkit.block.Lectern",
-                        "org.bukkit.Warning$WarningState", "org.bukkit.material.Directional",
-                        "org.bukkit.material.Openable", "org.bukkit.block.data.Directional",
-                        "org.bukkit.entity.Damageable", "org.bukkit.block.data.Ageable",
-                        "org.bukkit.block.data.type.Sapling", "org.bukkit.block.Furnace",
-                        "org.bukkit.block.SculkSensor", "org.bukkit.block.Sign", "org.bukkit.structure.Structure",
-                        "org.bukkit.block.data.type.StructureBlock$Mode", "org.bukkit.packs.DataPack$Compatibility",
-                        "org.bukkit.packs.DataPack$Source", "org.bukkit.profile.PlayerTextures$SkinModel",
-                        "org.bukkit.scoreboard.Team$Option", "org.bukkit.scoreboard.Team$OptionStatus",
-                        "org.bukkit.block.data.type.TechnicalPiston$Type", "org.bukkit.block.data.type.Switch$Face",
-                        "org.bukkit.block.data.type.Bamboo$Leaves", "org.bukkit.block.data.type.Jigsaw$Orientation",
-                        "org.bukkit.block.data.type.Wall$Height", "org.bukkit.block.data.type.BigDripleaf$Tilt",
-                        "org.bukkit.block.data.type.PointedDripstone$Thickness", "org.bukkit.block.data.type.Slab$Type",
-                        "org.bukkit.block.data.FaceAttachable$AttachedFace", "org.bukkit.block.data.Rail$Shape",
-                        "org.bukkit.block.data.Bisected$Half", "org.bukkit.block.data.type.Comparator$Mode",
-                        "org.bukkit.block.data.type.Bell$Attachment", "org.bukkit.block.data.type.Stairs$Shape",
-                        "org.bukkit.block.data.type.SculkSensor$Phase",
-                        "org.bukkit.block.data.type.RedstoneWire$Connection", "org.bukkit.block.data.type.Bed$Part",
-                        "org.bukkit.block.data.type.Door$Hinge", "org.bukkit.boss.DragonBattle$RespawnPhase",
-                        "org.bukkit.entity.Ageable", "org.bukkit.entity.MushroomCow$Variant",
-                        "org.bukkit.entity.Panda$Gene", "org.bukkit.entity.ItemDisplay$ItemDisplayTransform",
-                        "org.bukkit.entity.AbstractArrow$PickupStatus", "org.bukkit.entity.Skeleton$SkeletonType",
-                        "org.bukkit.entity.Warden$AngerLevel", "org.bukkit.entity.Rabbit$Type",
-                        "org.bukkit.entity.TextDisplay$TextAlignment", "org.bukkit.entity.TropicalFish$Pattern",
-                        "org.bukkit.entity.Wither$Head", "org.bukkit.entity.Llama$Color",
-                        "org.bukkit.entity.Boat$Status", "org.bukkit.entity.Boat$Type",
-                        "org.bukkit.entity.Display$Billboard", "org.bukkit.entity.Horse$Variant",
-                        "org.bukkit.entity.Horse$Color", "org.bukkit.entity.Horse$Style",
-                        "org.bukkit.entity.FishHook$HookState", "org.bukkit.entity.Parrot$Variant",
-                        "org.bukkit.entity.Evoker$Spell", "org.bukkit.entity.Fox$Type", "org.bukkit.entity.Ocelot$Type",
-                        "org.bukkit.entity.Cat$Type", "org.bukkit.entity.Axolotl$Variant",
-                        "org.bukkit.entity.ArmorStand$LockType", "org.bukkit.entity.Sniffer$State",
-                        "org.bukkit.Chunk$LoadLevel", "org.bukkit.Raid$RaidStatus", "org.bukkit.map.MapView$Scale",
-                        "org.bukkit.block.Jukebox", "org.bukkit.inventory.meta.BookMeta$Generation",
-                        "org.bukkit.block.data.type.Chest$Type", "org.bukkit.block.DecoratedPot$Side"
-                },
-                { "net.md_5",
-                        "https://javadoc.io/doc/net.md-5/bungeecord-api/latest/",
-                        "net.md_5.bungee.chat.TranslationRegistry$TranslationProvider" },
                 { "java.util", "https://docs.oracle.com/javase/8/docs/api/", "java.util.Collection",
                         "java.util.Comparator", "java.util.Deque",
                         "java.util.Enumeration", "java.util.EventListener", "java.util.Formattable",
@@ -136,17 +92,6 @@ public class App {
                         "java.util.concurrent.atomic.DoubleAccumulator", "java.util.concurrent.atomic.DoubleAdder",
                         "java.util.concurrent.atomic.LongAccumulator", "java.util.concurrent.atomic.LongAdder",
                         "java.util.concurrent.atomic.Striped64",
-                        "java.util.concurrent.locks.Condition", "java.util.concurrent.locks.Lock",
-                        "java.util.concurrent.locks.ReadWriteLock",
-                        "java.util.concurrent.locks.AbstractOwnableSynchronizer",
-                        "java.util.concurrent.locks.AbstractQueuedLongSynchronizer",
-                        "java.util.concurrent.locks.AbstractQueuedSynchronizer",
-                        "java.util.concurrent.locks.LockSupport", "java.util.concurrent.locks.ReentrantLock",
-                        "java.util.concurrent.locks.ReentrantReadWriteLock",
-                        "java.util.concurrent.locks.ReentrantReadWriteLock$ReadLock",
-                        "java.util.concurrent.locks.ReentrantReadWriteLock$WriteLock",
-                        "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject",
-                        "java.util.concurrent.locks.StampedLock", "java.util.function.BiConsumer",
                         "java.util.function.BiFunction", "java.util.function.BinaryOperator",
                         "java.util.function.BiPredicate", "java.util.function.BooleanSupplier",
                         "java.util.function.Consumer", "java.util.function.DoubleBinaryOperator",
@@ -183,7 +128,54 @@ public class App {
                         "java.util.stream.LongStream", "java.util.stream.LongStream$Builder",
                         "java.util.stream.LongStream$LongMapMultiConsumer", "java.util.stream.Stream",
                         "java.util.stream.Stream$Builder", "java.util.stream.StreamSupport",
-                }
+                        "java.util.concurrent.locks.AbstractQueuedLongSynchronizer$ConditionObject"
+                },
+                { "org.bukkit",
+                        "https://hub.spigotmc.org/javadocs/spigot/",
+                        "org.bukkit.StructureType", "org.bukkit.World$Environment", "org.bukkit.BanList$Type",
+                        "org.bukkit.plugin.ServicePriority", "org.bukkit.entity.EnderDragon$Phase",
+                        "org.bukkit.conversations.ConversationAbandonedEvent", "org.bukkit.command.Command",
+                        "org.bukkit.ChatColor", "org.bukkit.enchantments.EnchantmentTarget",
+                        "org.bukkit.entity.Spellcaster$Spell", "org.bukkit.block.Lectern",
+                        "org.bukkit.Warning$WarningState", "org.bukkit.material.Directional",
+                        "org.bukkit.material.Openable", "org.bukkit.block.data.Directional",
+                        "org.bukkit.entity.Damageable", "org.bukkit.block.data.Ageable",
+                        "org.bukkit.block.data.type.Sapling", "org.bukkit.block.Furnace",
+                        "org.bukkit.block.SculkSensor", "org.bukkit.block.Sign", "org.bukkit.structure.Structure",
+                        "org.bukkit.block.data.type.StructureBlock$Mode", "org.bukkit.packs.DataPack$Compatibility",
+                        "org.bukkit.packs.DataPack$Source", "org.bukkit.profile.PlayerTextures$SkinModel",
+                        "org.bukkit.scoreboard.Team$Option", "org.bukkit.scoreboard.Team$OptionStatus",
+                        "org.bukkit.block.data.type.TechnicalPiston$Type", "org.bukkit.block.data.type.Switch$Face",
+                        "org.bukkit.block.data.type.Bamboo$Leaves", "org.bukkit.block.data.type.Jigsaw$Orientation",
+                        "org.bukkit.block.data.type.Wall$Height", "org.bukkit.block.data.type.BigDripleaf$Tilt",
+                        "org.bukkit.block.data.type.PointedDripstone$Thickness", "org.bukkit.block.data.type.Slab$Type",
+                        "org.bukkit.block.data.FaceAttachable$AttachedFace", "org.bukkit.block.data.Rail$Shape",
+                        "org.bukkit.block.data.Bisected$Half", "org.bukkit.block.data.type.Comparator$Mode",
+                        "org.bukkit.block.data.type.Bell$Attachment", "org.bukkit.block.data.type.Stairs$Shape",
+                        "org.bukkit.block.data.type.SculkSensor$Phase",
+                        "org.bukkit.block.data.type.RedstoneWire$Connection", "org.bukkit.block.data.type.Bed$Part",
+                        "org.bukkit.block.data.type.Door$Hinge", "org.bukkit.boss.DragonBattle$RespawnPhase",
+                        "org.bukkit.entity.Ageable", "org.bukkit.entity.MushroomCow$Variant",
+                        "org.bukkit.entity.Panda$Gene", "org.bukkit.entity.ItemDisplay$ItemDisplayTransform",
+                        "org.bukkit.entity.AbstractArrow$PickupStatus", "org.bukkit.entity.Skeleton$SkeletonType",
+                        "org.bukkit.entity.Warden$AngerLevel", "org.bukkit.entity.Rabbit$Type",
+                        "org.bukkit.entity.TextDisplay$TextAlignment", "org.bukkit.entity.TropicalFish$Pattern",
+                        "org.bukkit.entity.Wither$Head", "org.bukkit.entity.Llama$Color",
+                        "org.bukkit.entity.Boat$Status", "org.bukkit.entity.Boat$Type",
+                        "org.bukkit.entity.Display$Billboard", "org.bukkit.entity.Horse$Variant",
+                        "org.bukkit.entity.Horse$Color", "org.bukkit.entity.Horse$Style",
+                        "org.bukkit.entity.FishHook$HookState", "org.bukkit.entity.Parrot$Variant",
+                        "org.bukkit.entity.Evoker$Spell", "org.bukkit.entity.Fox$Type", "org.bukkit.entity.Ocelot$Type",
+                        "org.bukkit.entity.Cat$Type", "org.bukkit.entity.Axolotl$Variant",
+                        "org.bukkit.entity.ArmorStand$LockType", "org.bukkit.entity.Sniffer$State",
+                        "org.bukkit.Chunk$LoadLevel", "org.bukkit.Raid$RaidStatus", "org.bukkit.map.MapView$Scale",
+                        "org.bukkit.block.Jukebox", "org.bukkit.inventory.meta.BookMeta$Generation",
+                        "org.bukkit.block.data.type.Chest$Type", "org.bukkit.block.DecoratedPot$Side"
+                },
+                { "net.md_5",
+                        "https://javadoc.io/doc/net.md-5/bungeecord-api/latest/",
+                        "net.md_5.bungee.chat.TranslationRegistry$TranslationProvider" }
+
         };
         HashMap<String, Object> parsed_packages = new HashMap<>();
 
@@ -217,23 +209,29 @@ public class App {
         // CLASSES
         // =======
         ArrayList<ParsedClass> classes = new ArrayList<ParsedClass>();
-        for (Class<? extends Object> cls : reflections.getSubTypesOf(Object.class)) {
-            if ((cls.getModifiers() & Modifier.PUBLIC) != Modifier.PUBLIC) {
-                continue;
-            }
-            classes.add(new ParsedClass(cls, doclink, cls.getPackageName(), webScraper));
+        ArrayList<ClassParserFuture> futures = new ArrayList<>();
+        int n = 0;
+        var clsses = reflections.getSubTypesOf(Object.class);
+        CountDownLatch latch = new CountDownLatch(clsses.size() + lostImports.length);
+        for (Class<? extends Object> cls : clsses) {
+            futures.add(new ClassParserFuture(n, cls, classes, doclink, webScraper, latch));
+            n++;
         }
-
         for (String importStr : lostImports) {
             Class<?> what;
             try {
                 what = Class.forName(importStr);
-                classes.add(new ParsedClass(what, doclink, what.getPackageName(), webScraper));
+                futures.add(new ClassParserFuture(n, what, classes, doclink, webScraper, latch));
             } catch (ClassNotFoundException e) {
                 e.printStackTrace();
                 System.exit(1);
             }
         }
+
+        for (var future : futures) {
+            future.start();
+        }
+        latch.countDown();
 
         HashMap<String, ParsedClass> classes_part_2 = new HashMap<>();
 
