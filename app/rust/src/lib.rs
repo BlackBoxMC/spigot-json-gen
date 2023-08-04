@@ -101,7 +101,6 @@ impl Parser {
 
         let class_name = &self.class_get_name(env, &cls)?;
         let id = format!("Class {}", class_name);
-        println!("{}", id);
         if let Some(g) = parsed_generics.get(&id) {
             Ok(g.to_vec())
         } else {
@@ -146,7 +145,6 @@ impl Parser {
 
         let class_name = &self.class_get_name(env, &cls)?;
         let id = format!("Method {}.{}", class_name, method_name);
-        println!("{}", id);
         if let Some(g) = parsed_method_generics.get(&id) {
             Ok(g.to_vec())
         } else {
