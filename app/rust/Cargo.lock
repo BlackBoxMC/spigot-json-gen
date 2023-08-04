@@ -730,10 +730,12 @@ dependencies = [
  "flapigen",
  "jni",
  "lazy_static",
+ "once_cell",
  "parking_lot",
  "phf 0.11.2",
  "regex",
  "reqwest",
+ "rustc-hash",
  "scraper",
  "tokio",
 ]

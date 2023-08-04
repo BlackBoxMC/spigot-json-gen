@@ -5,16 +5,42 @@ use std::{
     path::Path,
 };
 
-use eyre::eyre;
+use rustc_hash::FxHashMap as HashMap;
+
 use jni::{
     objects::{JClass, JObject, JObjectArray, JString},
     JNIEnv,
 };
 use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use phf::phf_map;
 use regex::Regex;
-use scraper::{element_ref::Select, html::Html, ElementRef, Selector};
+use scraper::{html::Html, ElementRef, Selector};
 use tokio::runtime::Runtime;
+
+pub struct GlobalHashMap {
+    inner: Lazy<Mutex<HashMap<String, Vec<String>>>>,
+}
+impl GlobalHashMap {
+    pub const fn new() -> Self {
+        Self {
+            inner: Lazy::new(|| Mutex::new(HashMap::default())),
+        }
+    }
+    pub fn get(&self, index: &String) -> Option<Vec<String>> {
+        match self.inner.lock().get(index) {
+            Some(a) => Some(a.clone()),
+            None => None,
+        }
+    }
+    pub fn insert(&self, index: String, res: Vec<String>) -> Option<Vec<String>> {
+        self.inner.lock().insert(index, res)
+    }
+}
+
+static PARSED_GENERICS: GlobalHashMap = GlobalHashMap::new();
+static PARSED_METHOD_GENERICS: GlobalHashMap = GlobalHashMap::new();
 
 lazy_static! {
     pub static ref NON_ALPHABET: Regex = Regex::new("[^a-zA-Z\\d\\s:]").unwrap();
@@ -95,30 +121,35 @@ pub fn get_generics<'a>(
     module_name: String,
     _method_name: Option<String>,
 ) -> Result<Vec<String>, Box<dyn Error>> {
-    let doc = get_url(module_name, env, cls).unwrap();
-    if let None = doc {
-        return Ok(Vec::new());
-    };
-    let doc = doc.unwrap();
-    let mut names = Vec::new();
-    let sel = Selector::parse(".title").unwrap();
-    let mut ele = doc.select(&sel);
-    if let Some(title) = ele.next() {
-        if let Some(cap) = PATTERN_GENERICS.captures(&element_get_text(title)) {
-            let fuck = cap
-                .get(2)
-                .unwrap()
-                .as_str()
-                .replace("<", "")
-                .replace(">", "");
-            let mut ok = fuck
-                .split(",")
-                .map(|f| f.to_string())
-                .collect::<Vec<String>>();
-            names.append(&mut ok);
+    if let Some(g) = PARSED_GENERICS.get(&module_name) {
+        Ok(g.clone())
+    } else {
+        let doc = get_url(module_name.clone(), env, cls).unwrap();
+        if let None = doc {
+            return Ok(Vec::new());
+        };
+        let doc = doc.unwrap();
+        let mut names = Vec::new();
+        let sel = Selector::parse(".title").unwrap();
+        let mut ele = doc.select(&sel);
+        if let Some(title) = ele.next() {
+            if let Some(cap) = PATTERN_GENERICS.captures(&element_get_text(title)) {
+                let fuck = cap
+                    .get(2)
+                    .unwrap()
+                    .as_str()
+                    .replace("<", "")
+                    .replace(">", "");
+                let mut ok = fuck
+                    .split(",")
+                    .map(|f| f.to_string())
+                    .collect::<Vec<String>>();
+                names.append(&mut ok);
+            }
         }
+        unsafe { PARSED_GENERICS.insert(module_name, names.clone()) };
+        Ok(names)
     }
-    Ok(names)
 }
 
 pub fn get_method_generics<'a>(
@@ -128,52 +159,57 @@ pub fn get_method_generics<'a>(
     method_name: Option<String>,
 ) -> Result<Vec<String>, Box<dyn Error>> {
     let method_name = method_name.unwrap();
+    let id = format!("{}.{}", &module_name, method_name);
+    if let Some(g) = unsafe { PARSED_METHOD_GENERICS.get(&id) } {
+        Ok(g.clone())
+    } else {
+        let doc = get_url(module_name, env, cls).unwrap();
+        if let None = doc {
+            return Ok(Vec::new());
+        };
+        let doc = doc.unwrap();
 
-    let doc = get_url(module_name, env, cls).unwrap();
-    if let None = doc {
-        return Ok(Vec::new());
-    };
-    let doc = doc.unwrap();
-
-    let rows_class = Selector::parse("tr").unwrap();
-    let code_class = Selector::parse("code").unwrap();
-    let mut rows = doc.select(&rows_class);
-    let mut names = Vec::new();
-    while let Some(row) = rows.next() {
-        let col_first = element_get_class(row, ".colFirst");
-        let col_last = element_get_class(row, ".colLast");
-        if let Some(first) = col_first {
-            if let Some(last) = col_last {
-                if let Some(member_name_link) = element_get_class(last, ".memberNameLink") {
-                    if !element_get_text(member_name_link).contains(&method_name) {
+        let rows_class = Selector::parse("tr").unwrap();
+        let code_class = Selector::parse("code").unwrap();
+        let mut rows = doc.select(&rows_class);
+        let mut names = Vec::new();
+        while let Some(row) = rows.next() {
+            let col_first = element_get_class(row, ".colFirst");
+            let col_last = element_get_class(row, ".colLast");
+            if let Some(first) = col_first {
+                if let Some(last) = col_last {
+                    if let Some(member_name_link) = element_get_class(last, ".memberNameLink") {
+                        if !element_get_text(member_name_link).contains(&method_name) {
+                            continue;
+                        }
+                    } else {
                         continue;
                     }
-                } else {
-                    continue;
                 }
-            }
-            let code = first.select(&code_class).collect::<Vec<ElementRef>>();
-            if let Some(c) = code.get(0) {
-                if !&c.inner_html().contains("<") {
-                    continue;
-                }
-                if let Some(cap) = METHOD_PATTERN_GENERICS.captures(&element_get_text(*c)) {
-                    let fuck = cap
-                        .get(2)
-                        .unwrap()
-                        .as_str()
-                        .replace("<", "")
-                        .replace(">", "");
-                    let mut ok = fuck
-                        .split(",")
-                        .map(|f| f.to_string())
-                        .collect::<Vec<String>>();
-                    names.append(&mut ok);
+                let code = first.select(&code_class).collect::<Vec<ElementRef>>();
+                if let Some(c) = code.get(0) {
+                    if !&c.inner_html().contains("<") {
+                        continue;
+                    }
+                    if let Some(cap) = METHOD_PATTERN_GENERICS.captures(&element_get_text(*c)) {
+                        let fuck = cap
+                            .get(2)
+                            .unwrap()
+                            .as_str()
+                            .replace("<", "")
+                            .replace(">", "");
+                        let mut ok = fuck
+                            .split(",")
+                            .map(|f| f.to_string())
+                            .collect::<Vec<String>>();
+                        names.append(&mut ok);
+                    }
                 }
             }
         }
+        PARSED_GENERICS.insert(id, names.clone());
+        Ok(names)
     }
-    Ok(names)
 }
 
 pub fn call_method_return_java_array<'a>(

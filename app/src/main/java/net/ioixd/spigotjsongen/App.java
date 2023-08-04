@@ -209,29 +209,23 @@ public class App {
         // CLASSES
         // =======
         ArrayList<ParsedClass> classes = new ArrayList<ParsedClass>();
-        ArrayList<ClassParserFuture> futures = new ArrayList<>();
-        int n = 0;
-        var clsses = reflections.getSubTypesOf(Object.class);
-        CountDownLatch latch = new CountDownLatch(clsses.size() + lostImports.length);
-        for (Class<? extends Object> cls : clsses) {
-            futures.add(new ClassParserFuture(n, cls, classes, doclink, webScraper, latch));
-            n++;
+        for (Class<? extends Object> cls : reflections.getSubTypesOf(Object.class)) {
+            if ((cls.getModifiers() & Modifier.PUBLIC) != Modifier.PUBLIC) {
+                continue;
+            }
+            classes.add(new ParsedClass(cls, doclink, cls.getPackageName(), webScraper));
+
         }
         for (String importStr : lostImports) {
             Class<?> what;
             try {
                 what = Class.forName(importStr);
-                futures.add(new ClassParserFuture(n, what, classes, doclink, webScraper, latch));
+                classes.add(new ParsedClass(what, doclink, what.getPackageName(), webScraper));
             } catch (ClassNotFoundException e) {
                 e.printStackTrace();
                 System.exit(1);
             }
         }
-
-        for (var future : futures) {
-            future.start();
-        }
-        latch.countDown();
 
         HashMap<String, ParsedClass> classes_part_2 = new HashMap<>();
 

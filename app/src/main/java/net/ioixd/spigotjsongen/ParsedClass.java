@@ -9,9 +9,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Vector;
-import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
@@ -49,30 +47,30 @@ public class ParsedClass {
         this.name = cls.getName().replace(this.packageName + ".", "");
         this.isInterface = cls.isInterface();
 
-        String url = doclink + cls.getName().replace(".", "/").replace("$", ".") + ".html";
-
         if (cls.getSuperclass() != null) {
             this.superClass = new ParsedClass(cls.getSuperclass(), doclink, packageName, webScraper);
         }
 
         if (cls.getDeclaredClasses().length >= 1) {
-            var classes = Arrays.asList(cls.getDeclaredClasses()).stream().filter(f -> {
-                return !f.getPackageName().startsWith("java");
-            }).collect(Collectors.toList());
-
-            CountDownLatch latch = new CountDownLatch(classes.size());
-
             this.classes = new ArrayList<ParsedClass>();
-            var futures = new ArrayList<ClassParserFuture>();
-            int n = 0;
-            for (Class<?> cl : classes) {
-                futures.add(new ClassParserFuture(n, cl, this.classes, doclink, webScraper, latch));
-                n += 1;
+            for (Class<?> cl : cls.getDeclaredClasses()) {
+                if (cl.getPackageName().startsWith("java")) {
+                    // hell naw
+                    continue;
+                }
+                this.classes.add(new ParsedClass(cl, doclink, packageName, webScraper));
             }
-            for (var future : futures) {
-                future.start();
+        }
+        if (cls.getInterfaces().length >= 1) {
+            this.interfaces = new ArrayList<ParsedClass>();
+            for (Class<?> i : cls.getInterfaces()) {
+                if (cls.getDeclaringClass() != null) {
+                    if (cls.getDeclaringClass().getName() == i.getName()) {
+                        continue;
+                    }
+                }
+                this.interfaces.add(new ParsedClass(i, doclink, packageName, webScraper));
             }
-            latch.countDown();
         }
         if (cls.getConstructors().length >= 1) {
             this.constructors = new ArrayList<ParsedConstructor>();
@@ -96,32 +94,6 @@ public class ParsedClass {
                 };
                 this.methods.add(new ParsedMethod(m, cls, String.join(".", fuckyou), webScraper));
             }
-        }
-        if (cls.getInterfaces().length >= 1) {
-
-            var classes = Arrays.asList(cls.getInterfaces()).stream().filter(f -> {
-                if (cls.getDeclaringClass() != null) {
-                    return !(cls.getDeclaringClass().getName() == f.getName());
-                } else {
-                    return true;
-                }
-            }).collect(Collectors.toList());
-
-            CountDownLatch latch = new CountDownLatch(classes.size());
-
-            this.interfaces = new ArrayList<ParsedClass>();
-            var futures = new ArrayList<ClassParserFuture>();
-            int n = 0;
-            for (Class<?> cl : classes) {
-                futures.add(new ClassParserFuture(n, cl, this.interfaces, doclink,
-                        webScraper, latch));
-                n += 1;
-            }
-            for (var future : futures) {
-                future.start();
-            }
-            latch.countDown();
-
         }
 
         if (cls.isEnum()) {
@@ -157,6 +129,5 @@ public class ParsedClass {
          */
 
         this.generics = webScraper.getGenerics(String.join(".", fuckyou), cls);
-
     }
 }
