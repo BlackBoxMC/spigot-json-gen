@@ -10,9 +10,9 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.concurrent.CountDownLatch;
 
 import org.reflections.Reflections;
+import org.reflections.scanners.Scanners;
 import org.reflections.scanners.SubTypesScanner;
 
 import com.google.gson.Gson;
@@ -214,7 +214,6 @@ public class App {
                 continue;
             }
             classes.add(new ParsedClass(cls, doclink, cls.getPackageName(), webScraper));
-
         }
         for (String importStr : lostImports) {
             Class<?> what;

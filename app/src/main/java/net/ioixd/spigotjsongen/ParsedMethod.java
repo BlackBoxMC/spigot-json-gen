@@ -1,17 +1,11 @@
 package net.ioixd.spigotjsongen;
 
-import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.stream.Collectors;
-
-import org.jetbrains.annotations.Nullable;
-
-import org.jetbrains.annotations.NotNull;
 
 public class ParsedMethod {
     public String[] generics;

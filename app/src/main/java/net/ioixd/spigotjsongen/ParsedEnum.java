@@ -22,8 +22,6 @@ public class ParsedEnum {
         this.name = e.getClass().getSimpleName();
         this.packageName = e.getClass().getPackageName();
 
-        String url = doclink + e.getClass().getName().replace(".", "/").replace("$", ".") + ".html";
-
         Enum<?>[] constants = e.getClass().getEnumConstants();
         if (constants != null) {
             for (Enum<?> en : constants) {

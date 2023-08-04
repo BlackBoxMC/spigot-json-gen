@@ -17,30 +17,190 @@ use parking_lot::Mutex;
 use phf::phf_map;
 use regex::Regex;
 use scraper::{html::Html, ElementRef, Selector};
-use tokio::runtime::Runtime;
+use tokio::runtime::{self, Runtime};
 
-pub struct GlobalHashMap {
-    inner: Lazy<Mutex<HashMap<String, Vec<String>>>>,
+pub struct Parser {
+    parsed_generics: Mutex<HashMap<String, Vec<String>>>,
+    parsed_method_generics: Mutex<HashMap<String, Vec<String>>>,
+    runtime: Runtime,
 }
-impl GlobalHashMap {
-    pub const fn new() -> Self {
+
+impl Parser {
+    pub fn new() -> Self {
         Self {
-            inner: Lazy::new(|| Mutex::new(HashMap::default())),
+            parsed_generics: Mutex::new(HashMap::default()),
+            parsed_method_generics: Mutex::new(HashMap::default()),
+            runtime: runtime::Builder::new_current_thread().build().unwrap(),
         }
     }
-    pub fn get(&self, index: &String) -> Option<Vec<String>> {
-        match self.inner.lock().get(index) {
-            Some(a) => Some(a.clone()),
-            None => None,
+    pub fn class_get_name<'a>(
+        &self,
+        env: &mut JNIEnv<'a>,
+        cls: &JClass<'a>,
+    ) -> Result<String, Box<dyn Error>> {
+        let class_name_obj = env.call_method(cls, "getName", "()Ljava/lang/String;", &[])?;
+        let class_name = env
+            .get_string(unsafe { &jni::objects::JString::from_raw(class_name_obj.as_jni().l) })?
+            .to_string_lossy()
+            .to_string();
+        Ok(class_name)
+    }
+    pub fn get_url<'a>(
+        &self,
+        module_name: String,
+        env: &mut JNIEnv<'a>,
+        cls: JClass<'a>,
+    ) -> Result<Option<Html>, Box<dyn Error>> {
+        self.runtime
+            .block_on(async { self.get_url_async(module_name, env, cls).await })
+    }
+    pub async fn get_url_async<'a>(
+        &self,
+        module_name: String,
+        env: &mut JNIEnv<'a>,
+        cls: JClass<'a>,
+    ) -> Result<Option<Html>, Box<dyn Error>> {
+        match DOC_LINKS.get(&module_name) {
+            Some(doclink) => {
+                let class_name = &self.class_get_name(env, &cls)?;
+                let url = format!("{}{}.html", doclink, class_name.replace(".", "/"));
+                let url_filename = NON_ALPHABET.replace_all(&url, "").to_string();
+                let url_path =
+                    Path::join(Path::new(".javadocCache"), format!("{}.txt", url_filename));
+                match File::open(&url_path) {
+                    Ok(mut file) => {
+                        let mut buf = String::new();
+                        file.read_to_string(&mut buf)?;
+                        Ok(Some(Html::parse_document(&buf)))
+                    }
+                    Err(err) => {
+                        if let std::io::ErrorKind::NotFound = err.kind() {
+                            let req = reqwest::get(url).await?;
+                            let mut f = File::create(url_path)?;
+                            let text = &req.text().await?;
+                            f.write(text.as_bytes())?;
+                            Ok(Some(Html::parse_document(text)))
+                        } else {
+                            Err(Box::new(err))
+                        }
+                    }
+                }
+            }
+            None => return Ok(None),
         }
     }
-    pub fn insert(&self, index: String, res: Vec<String>) -> Option<Vec<String>> {
-        self.inner.lock().insert(index, res)
+
+    pub fn get_generics<'a>(
+        &self,
+        env: &mut JNIEnv<'a>,
+        cls: JClass<'a>,
+        module_name: String,
+        _method_name: Option<String>,
+    ) -> Result<Vec<String>, Box<dyn Error>> {
+        let mut parsed_generics = self.parsed_generics.lock();
+
+        let class_name = &self.class_get_name(env, &cls)?;
+        let id = format!("Class {}", class_name);
+        println!("{}", id);
+        if let Some(g) = parsed_generics.get(&id) {
+            Ok(g.to_vec())
+        } else {
+            let doc = self.get_url(module_name.clone(), env, cls).unwrap();
+            if let None = doc {
+                return Ok(Vec::new());
+            };
+            let doc = doc.unwrap();
+            let mut names = Vec::new();
+            let sel = Selector::parse(".title").unwrap();
+            let mut ele = doc.select(&sel);
+            if let Some(title) = ele.next() {
+                if let Some(cap) = PATTERN_GENERICS.captures(&element_get_text(title)) {
+                    let fuck = cap
+                        .get(2)
+                        .unwrap()
+                        .as_str()
+                        .replace("<", "")
+                        .replace(">", "");
+                    let mut ok = fuck
+                        .split(",")
+                        .map(|f| f.to_string())
+                        .collect::<Vec<String>>();
+                    names.append(&mut ok);
+                }
+            }
+            parsed_generics.insert(id, names.clone());
+            Ok(names)
+        }
+    }
+
+    pub fn get_method_generics<'a>(
+        &self,
+        env: &mut JNIEnv<'a>,
+        cls: JClass<'a>,
+        module_name: String,
+        method_name: Option<String>,
+    ) -> Result<Vec<String>, Box<dyn Error>> {
+        let mut parsed_method_generics = self.parsed_method_generics.lock();
+
+        let method_name = method_name.unwrap();
+
+        let class_name = &self.class_get_name(env, &cls)?;
+        let id = format!("Method {}.{}", class_name, method_name);
+        println!("{}", id);
+        if let Some(g) = parsed_method_generics.get(&id) {
+            Ok(g.to_vec())
+        } else {
+            let doc = self.get_url(module_name, env, cls).unwrap();
+            if let None = doc {
+                return Ok(Vec::new());
+            };
+            let doc = doc.unwrap();
+
+            let rows_class = Selector::parse("tr").unwrap();
+            let code_class = Selector::parse("code").unwrap();
+            let mut rows = doc.select(&rows_class);
+            let mut names = Vec::new();
+            while let Some(row) = rows.next() {
+                let col_first = element_get_class(row, ".colFirst");
+                let col_last = element_get_class(row, ".colLast");
+                if let Some(first) = col_first {
+                    if let Some(last) = col_last {
+                        if let Some(member_name_link) = element_get_class(last, ".memberNameLink") {
+                            if !element_get_text(member_name_link).contains(&method_name) {
+                                continue;
+                            }
+                        } else {
+                            continue;
+                        }
+                    }
+                    let code = first.select(&code_class).collect::<Vec<ElementRef>>();
+                    if let Some(c) = code.get(0) {
+                        if !&c.inner_html().contains("<") {
+                            continue;
+                        }
+                        if let Some(cap) = METHOD_PATTERN_GENERICS.captures(&element_get_text(*c)) {
+                            let fuck = cap
+                                .get(2)
+                                .unwrap()
+                                .as_str()
+                                .replace("<", "")
+                                .replace(">", "");
+                            let mut ok = fuck
+                                .split(",")
+                                .map(|f| f.to_string())
+                                .collect::<Vec<String>>();
+                            names.append(&mut ok);
+                        }
+                    }
+                }
+            }
+            parsed_method_generics.insert(id, names.clone());
+            Ok(names)
+        }
     }
 }
 
-static PARSED_GENERICS: GlobalHashMap = GlobalHashMap::new();
-static PARSED_METHOD_GENERICS: GlobalHashMap = GlobalHashMap::new();
+static PARSER: Lazy<Parser> = Lazy::new(|| Parser::new());
 
 lazy_static! {
     pub static ref NON_ALPHABET: Regex = Regex::new("[^a-zA-Z\\d\\s:]").unwrap();
@@ -48,10 +208,6 @@ lazy_static! {
         Regex::new("(<|&lt;)([A-Za-z,\\s]*?)(>|&gt;)").unwrap();
     pub static ref METHOD_PATTERN_GENERICS: Regex =
         Regex::new("(<)([A-Za-z,\\s]*?)(>\\s)").unwrap();
-    pub static ref RUNTIME: Runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
 }
 
 static DOC_LINKS: phf::Map<&'static str, &'static str> = phf_map! {
@@ -75,141 +231,6 @@ pub fn element_get_class(el: ElementRef, class_name: impl Into<String>) -> Optio
 
 pub fn element_get_text(el: ElementRef) -> String {
     el.text().collect::<Vec<&str>>().join("")
-}
-
-pub fn get_url<'a>(
-    module_name: String,
-    env: &mut JNIEnv<'a>,
-    cls: JClass<'a>,
-) -> Result<Option<Html>, Box<dyn Error>> {
-    match DOC_LINKS.get(&module_name) {
-        Some(doclink) => {
-            let class_name_obj = env.call_method(cls, "getName", "()Ljava/lang/String;", &[])?;
-            let class_name = env
-                .get_string(unsafe { &jni::objects::JString::from_raw(class_name_obj.as_jni().l) })?
-                .to_string_lossy()
-                .to_string();
-            let url = format!("{}{}.html", doclink, class_name.replace(".", "/"));
-            let url_filename = NON_ALPHABET.replace_all(&url, "").to_string();
-            let url_path = Path::join(Path::new(".javadocCache"), format!("{}.txt", url_filename));
-            match File::open(&url_path) {
-                Ok(mut file) => {
-                    let mut buf = String::new();
-                    file.read_to_string(&mut buf)?;
-                    Ok(Some(Html::parse_document(&buf)))
-                }
-                Err(err) => {
-                    if let std::io::ErrorKind::NotFound = err.kind() {
-                        let req = reqwest::blocking::get(url)?;
-                        let mut f = File::create(url_path)?;
-                        let text = &req.text()?;
-                        f.write(text.as_bytes())?;
-                        Ok(Some(Html::parse_document(text)))
-                    } else {
-                        Err(Box::new(err))
-                    }
-                }
-            }
-        }
-        None => return Ok(None),
-    }
-}
-
-pub fn get_generics<'a>(
-    env: &mut JNIEnv<'a>,
-    cls: JClass<'a>,
-    module_name: String,
-    _method_name: Option<String>,
-) -> Result<Vec<String>, Box<dyn Error>> {
-    if let Some(g) = PARSED_GENERICS.get(&module_name) {
-        Ok(g.clone())
-    } else {
-        let doc = get_url(module_name.clone(), env, cls).unwrap();
-        if let None = doc {
-            return Ok(Vec::new());
-        };
-        let doc = doc.unwrap();
-        let mut names = Vec::new();
-        let sel = Selector::parse(".title").unwrap();
-        let mut ele = doc.select(&sel);
-        if let Some(title) = ele.next() {
-            if let Some(cap) = PATTERN_GENERICS.captures(&element_get_text(title)) {
-                let fuck = cap
-                    .get(2)
-                    .unwrap()
-                    .as_str()
-                    .replace("<", "")
-                    .replace(">", "");
-                let mut ok = fuck
-                    .split(",")
-                    .map(|f| f.to_string())
-                    .collect::<Vec<String>>();
-                names.append(&mut ok);
-            }
-        }
-        unsafe { PARSED_GENERICS.insert(module_name, names.clone()) };
-        Ok(names)
-    }
-}
-
-pub fn get_method_generics<'a>(
-    env: &mut JNIEnv<'a>,
-    cls: JClass<'a>,
-    module_name: String,
-    method_name: Option<String>,
-) -> Result<Vec<String>, Box<dyn Error>> {
-    let method_name = method_name.unwrap();
-    let id = format!("{}.{}", &module_name, method_name);
-    if let Some(g) = unsafe { PARSED_METHOD_GENERICS.get(&id) } {
-        Ok(g.clone())
-    } else {
-        let doc = get_url(module_name, env, cls).unwrap();
-        if let None = doc {
-            return Ok(Vec::new());
-        };
-        let doc = doc.unwrap();
-
-        let rows_class = Selector::parse("tr").unwrap();
-        let code_class = Selector::parse("code").unwrap();
-        let mut rows = doc.select(&rows_class);
-        let mut names = Vec::new();
-        while let Some(row) = rows.next() {
-            let col_first = element_get_class(row, ".colFirst");
-            let col_last = element_get_class(row, ".colLast");
-            if let Some(first) = col_first {
-                if let Some(last) = col_last {
-                    if let Some(member_name_link) = element_get_class(last, ".memberNameLink") {
-                        if !element_get_text(member_name_link).contains(&method_name) {
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-                }
-                let code = first.select(&code_class).collect::<Vec<ElementRef>>();
-                if let Some(c) = code.get(0) {
-                    if !&c.inner_html().contains("<") {
-                        continue;
-                    }
-                    if let Some(cap) = METHOD_PATTERN_GENERICS.captures(&element_get_text(*c)) {
-                        let fuck = cap
-                            .get(2)
-                            .unwrap()
-                            .as_str()
-                            .replace("<", "")
-                            .replace(">", "");
-                        let mut ok = fuck
-                            .split(",")
-                            .map(|f| f.to_string())
-                            .collect::<Vec<String>>();
-                        names.append(&mut ok);
-                    }
-                }
-            }
-        }
-        PARSED_GENERICS.insert(id, names.clone());
-        Ok(names)
-    }
 }
 
 pub fn call_method_return_java_array<'a>(
@@ -239,10 +260,28 @@ pub fn call_method_return_java_array<'a>(
     arr
 }
 
+pub fn get_generics<'a>(
+    env: &mut JNIEnv<'a>,
+    cls: JClass<'a>,
+    module_name: String,
+    _method_name: Option<String>,
+) -> Result<Vec<String>, Box<dyn Error>> {
+    PARSER.get_generics(env, cls, module_name, _method_name)
+}
+
+pub fn get_method_generics<'a>(
+    env: &mut JNIEnv<'a>,
+    cls: JClass<'a>,
+    module_name: String,
+    method_name: Option<String>,
+) -> Result<Vec<String>, Box<dyn Error>> {
+    PARSER.get_method_generics(env, cls, module_name, method_name)
+}
+
 #[no_mangle]
 pub extern "system" fn Java_net_ioixd_spigotjsongen_WebScraper_getGenerics<'a>(
     mut env: JNIEnv<'a>,
-    this: JObject,
+    _this: JObject,
     module_name_raw: JString<'a>,
     cls: JClass<'a>,
 ) -> JObjectArray<'a> {
@@ -258,7 +297,7 @@ pub extern "system" fn Java_net_ioixd_spigotjsongen_WebScraper_getGenerics<'a>(
 #[no_mangle]
 pub extern "system" fn Java_net_ioixd_spigotjsongen_WebScraper_getMethodGenerics<'a>(
     mut env: JNIEnv<'a>,
-    this: JObject,
+    _this: JObject,
     module_name_raw: JString<'a>,
     cls: JClass<'a>,
     method_name_raw: JString<'a>,
