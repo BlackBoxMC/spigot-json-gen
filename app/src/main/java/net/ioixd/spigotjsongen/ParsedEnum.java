@@ -60,7 +60,8 @@ public class ParsedEnum {
                             parts[0],
                             parts[1]
                     };
-                    this.methods.add(new ParsedMethod(m, e.getClass(), String.join(".", fuckyou), webScraper));
+                    this.methods.add(
+                            new ParsedMethod(m, e.getClass(), String.join(".", fuckyou), new String[] {}, webScraper));
                 }
             }
         }

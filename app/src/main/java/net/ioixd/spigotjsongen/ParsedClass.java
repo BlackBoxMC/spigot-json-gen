@@ -72,6 +72,18 @@ public class ParsedClass {
                 this.fields.put(f.getName(), f.getType().getName());
             }
         }
+
+        if (cls.getPackageName() == packageName) {
+            String[] parts = cls.getPackageName().split("\\.");
+            String[] fuckyou = new String[] {
+                    parts[0],
+                    parts[1]
+            };
+            this.generics = webScraper.getGenerics(String.join(".", fuckyou), cls);
+        } else {
+            this.generics = new String[] {};
+        }
+
         if (cls.getMethods().length >= 1) {
             this.methods = new ArrayList<ParsedMethod>();
             for (Method m : cls.getMethods()) {
@@ -80,7 +92,7 @@ public class ParsedClass {
                         parts[0],
                         parts[1]
                 };
-                this.methods.add(new ParsedMethod(m, cls, String.join(".", fuckyou), webScraper));
+                this.methods.add(new ParsedMethod(m, cls, String.join(".", fuckyou), this.generics, webScraper));
             }
         }
 
@@ -93,29 +105,5 @@ public class ParsedClass {
 
         this.modifiers = cls.getModifiers();
 
-        // Ok time for the information that Java just doesn't fucking give us because
-        // fuck you that's why
-        if (cls.getPackageName() != packageName) {
-            return;
-        }
-        String[] parts = cls.getPackageName().split("\\.");
-        String[] fuckyou = new String[] {
-                parts[0],
-                parts[1]
-        };
-        // Generics
-        /*
-         * var generics = new ArrayList<String>();
-         * var typeParams = cls.getTypeParameters();
-         * for (var parm : typeParams) {
-         * var bounds = parm.getBounds();
-         * for (var bound : bounds) {
-         * generics.add(bound.toString());
-         * }
-         * }
-         * this.generics = (String[]) generics.toArray();
-         */
-
-        this.generics = webScraper.getGenerics(String.join(".", fuckyou), cls);
     }
 }

@@ -25,7 +25,8 @@ public class ParsedMethod {
 
     public boolean isDefault;
 
-    public ParsedMethod(Method method, Class<?> upperClass, String upperDoclink, WebScraper webScraper) {
+    public ParsedMethod(Method method, Class<?> upperClass, String upperDoclink, String[] upperGenerics,
+            WebScraper webScraper) {
         this.name = method.getName();
         this.exceptionTypes = (ArrayList<String>) new ArrayList<>(Arrays.asList(method.getExceptionTypes())).stream()
                 .map(f -> {
@@ -60,6 +61,19 @@ public class ParsedMethod {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        var upperGenerics_ = Arrays.asList(upperGenerics);
+        ArrayList<String> generics_ = new ArrayList<>();
+        for (String gen : this.generics) {
+            if (!upperGenerics_.contains(gen)) {
+                generics_.add(gen);
+            }
+        }
+        var generics__ = new String[generics_.size()];
+        for (int i = 0; i < generics_.size(); i++) {
+            generics__[i] = generics_.get(i);
+        }
+        this.generics = generics__;
 
         this.annotations = new ArrayList<>(Arrays.asList());
         for (Annotation annotation : method.getAnnotations()) {

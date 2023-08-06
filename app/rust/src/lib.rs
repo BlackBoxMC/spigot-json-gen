@@ -30,7 +30,10 @@ impl Parser {
         Self {
             parsed_generics: Mutex::new(HashMap::default()),
             parsed_method_generics: Mutex::new(HashMap::default()),
-            runtime: runtime::Builder::new_current_thread().build().unwrap(),
+            runtime: runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap(),
         }
     }
     pub fn class_get_name<'a>(
@@ -100,7 +103,7 @@ impl Parser {
         let mut parsed_generics = self.parsed_generics.lock();
 
         let class_name = &self.class_get_name(env, &cls)?;
-        let id = format!("Class {}", class_name);
+        let id = format!("{}", class_name);
         if let Some(g) = parsed_generics.get(&id) {
             Ok(g.to_vec())
         } else {
@@ -144,7 +147,7 @@ impl Parser {
         let method_name = method_name.unwrap();
 
         let class_name = &self.class_get_name(env, &cls)?;
-        let id = format!("Method {}.{}", class_name, method_name);
+        let id = format!("{}.{}", class_name, method_name);
         if let Some(g) = parsed_method_generics.get(&id) {
             Ok(g.to_vec())
         } else {
@@ -188,6 +191,7 @@ impl Parser {
                                 .map(|f| f.to_string())
                                 .collect::<Vec<String>>();
                             names.append(&mut ok);
+                            break;
                         }
                     }
                 }
@@ -202,10 +206,9 @@ static PARSER: Lazy<Parser> = Lazy::new(|| Parser::new());
 
 lazy_static! {
     pub static ref NON_ALPHABET: Regex = Regex::new("[^a-zA-Z\\d\\s:]").unwrap();
-    pub static ref PATTERN_GENERICS: Regex =
-        Regex::new("(<|&lt;)([A-Za-z,\\s]*?)(>|&gt;)").unwrap();
+    pub static ref PATTERN_GENERICS: Regex = Regex::new("(<|&lt;)([A-Za-z,\\s]*)(>$|>$)").unwrap();
     pub static ref METHOD_PATTERN_GENERICS: Regex =
-        Regex::new("(<)([A-Za-z,\\s]*?)(>\\s)").unwrap();
+        Regex::new("(<)([A-Za-z,\\s]*)(>$|>\\s)").unwrap();
 }
 
 static DOC_LINKS: phf::Map<&'static str, &'static str> = phf_map! {
