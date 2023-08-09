@@ -82,24 +82,19 @@ public class ParsedClass {
                 parts[1]
         };
 
-        if (cls.getPackageName() == packageName) {
-            this.generics = webScraper.getGenerics(String.join(".", fuckyou), cls);
-        } else {
-            this.generics = new String[] {};
-        }
+        /*
+         * if (cls.getPackageName() == packageName) {
+         * this.generics = webScraper.getGenerics(String.join(".", fuckyou), cls);
+         * } else {
+         * this.generics = new String[] {};
+         * }
+         */
 
         if (cls.getMethods().length >= 1) {
             this.methods = new ArrayList<ParsedMethod>();
             for (Method m : cls.getMethods()) {
                 this.methods
                         .add(new ParsedMethod(m, cls, String.join(".", fuckyou), this.generics, webScraper, toplevel));
-            }
-        }
-
-        if (cls.isEnum()) {
-            this.enums = new ArrayList<ParsedEnum>();
-            for (Object o : cls.getEnumConstants()) {
-                this.enums.add(new ParsedEnum((Enum<?>) o, doclink, packageName, webScraper));
             }
         }
 

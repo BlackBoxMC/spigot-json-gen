@@ -13,7 +13,7 @@ compileJava {
 application {
     // Define the main class for the application.
     mainClass = 'net.ioixd.spigotjsongen.App'
-    applicationDefaultJvmArgs += "-Djava.library.path=${projectDir}/lib/"
+    applicationDefaultJvmArgs = ["-Djava.library.path=${projectDir}/lib/", "-Xms1m", "-Xmx16384m"]
 }
 
 repositories {
@@ -79,6 +79,7 @@ tasks.withType(JavaCompile).configureEach {
     }
 }
 
+
 processResources {
     def props = [version: version]
     inputs.properties props
@@ -129,7 +130,9 @@ tasks.create(name: "rust-deploy", type: Sync, dependsOn: "cargo-build") {
 
 clean.dependsOn "clean-rust"
 tasks.withType(JavaCompile) {
-    compileTask -> compileTask.dependsOn "rust-deploy"
+    compileTask -> {
+        compileTask.dependsOn "rust-deploy"
+    }
 }
 
 sourceSets {

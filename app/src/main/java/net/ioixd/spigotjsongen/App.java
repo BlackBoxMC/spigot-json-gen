@@ -9,7 +9,12 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.reflections.Reflections;
 import org.reflections.scanners.Scanners;
@@ -19,62 +24,11 @@ import com.google.gson.Gson;
 
 public class App {
 
-    public static void main(String[] args) throws IOException {
+    static int cores = Runtime.getRuntime().availableProcessors();
+
+    public static void main(String[] args) throws IOException, InterruptedException {
         WebScraper webScraper = new WebScraper();
         String[][] packages = new String[][] {
-                { "java.util", "https://docs.oracle.com/javase/8/docs/api/", "java.util.Collection",
-                        "java.util.Comparator", "java.util.Deque",
-                        "java.util.Enumeration", "java.util.EventListener", "java.util.Formattable",
-                        "java.util.Iterator", "java.util.List", "java.util.ListIterator", "java.util.Map",
-                        "java.util.Map$Entry", "java.util.NavigableMap", "java.util.NavigableSet", "java.util.Observer",
-                        "java.util.PrimitiveIterator", "java.util.PrimitiveIterator$OfDouble",
-                        "java.util.PrimitiveIterator$OfInt", "java.util.PrimitiveIterator$OfLong", "java.util.Queue",
-                        "java.util.RandomAccess", "java.util.Set", "java.util.SortedMap", "java.util.SortedSet",
-                        "java.util.Spliterator", "java.util.Spliterator$OfDouble", "java.util.Spliterator$OfInt",
-                        "java.util.Spliterator$OfLong", "java.util.Spliterator$OfPrimitive",
-                        "java.util.AbstractCollection", "java.util.AbstractList", "java.util.AbstractMap",
-                        "java.util.AbstractMap$SimpleEntry", "java.util.AbstractMap$SimpleImmutableEntry",
-                        "java.util.AbstractQueue", "java.util.AbstractSequentialList", "java.util.AbstractSet",
-                        "java.util.ArrayDeque", "java.util.ArrayList", "java.util.Arrays", "java.util.Base64",
-                        "java.util.Base64$Decoder", "java.util.Base64$Encoder", "java.util.BitSet",
-                        "java.util.Calendar", "java.util.Calendar$Builder", "java.util.Collections",
-                        "java.util.Currency", "java.util.Date", "java.util.Dictionary",
-                        "java.util.DoubleSummaryStatistics", "java.util.EnumMap", "java.util.EnumSet",
-                        "java.util.EventListenerProxy", "java.util.EventObject", "java.util.FormattableFlags",
-                        "java.util.Formatter", "java.util.GregorianCalendar", "java.util.HashMap", "java.util.HashSet",
-                        "java.util.Hashtable", "java.util.IdentityHashMap", "java.util.IntSummaryStatistics",
-                        "java.util.LinkedHashMap", "java.util.LinkedHashSet", "java.util.LinkedList",
-                        "java.util.ListResourceBundle", "java.util.Locale", "java.util.Locale$Builder",
-                        "java.util.Locale$LanguageRange", "java.util.LongSummaryStatistics", "java.util.Objects",
-                        "java.util.Observable", "java.util.Optional", "java.util.OptionalDouble",
-                        "java.util.OptionalInt", "java.util.OptionalLong", "java.util.PriorityQueue",
-                        "java.util.Properties", "java.util.PropertyPermission", "java.util.PropertyResourceBundle",
-                        "java.util.Random", "java.util.ResourceBundle", "java.util.ResourceBundle$Control",
-                        "java.util.Scanner", "java.util.ServiceLoader", "java.util.SimpleTimeZone",
-                        "java.util.Spliterators", "java.util.Spliterators$AbstractDoubleSpliterator",
-                        "java.util.Spliterators$AbstractIntSpliterator",
-                        "java.util.Spliterators$AbstractLongSpliterator", "java.util.Spliterators$AbstractSpliterator",
-                        "java.util.SplittableRandom", "java.util.Stack", "java.util.StringJoiner",
-                        "java.util.StringTokenizer", "java.util.Timer", "java.util.TimerTask", "java.util.TimeZone",
-                        "java.util.TreeMap", "java.util.TreeSet", "java.util.UUID", "java.util.Vector",
-                        "java.util.WeakHashMap", "java.util.regex.Pattern", "java.util.logging.Filter",
-                        "java.util.logging.LoggingMXBean", "java.util.logging.ConsoleHandler",
-                        "java.util.logging.ErrorManager", "java.util.logging.FileHandler",
-                        "java.util.logging.Formatter", "java.util.logging.Handler", "java.util.logging.Level",
-                        "java.util.logging.Logger", "java.util.logging.LoggingPermission",
-                        "java.util.logging.LogManager", "java.util.logging.LogRecord",
-                        "java.util.logging.MemoryHandler", "java.util.logging.SimpleFormatter",
-                        "java.util.logging.SocketHandler", "java.util.logging.StreamHandler",
-                        "java.util.logging.XMLFormatter",
-                        "java.util.random.RandomGenerator",
-                        "java.util.random.RandomGenerator$ArbitrarilyJumpableGenerator",
-                        "java.util.random.RandomGenerator$JumpableGenerator",
-                        "java.util.random.RandomGenerator$LeapableGenerator",
-                        "java.util.random.RandomGenerator$SplittableGenerator",
-                        "java.util.random.RandomGenerator$StreamableGenerator",
-                        "java.util.random.RandomGeneratorFactory",
-                        "java.util.Iterator"
-                },
                 { "org.bukkit",
                         "https://hub.spigotmc.org/javadocs/spigot/",
                         "org.bukkit.StructureType", "org.bukkit.World$Environment", "org.bukkit.BanList$Type",
@@ -119,10 +73,64 @@ public class App {
                 },
                 { "net.md_5",
                         "https://javadoc.io/doc/net.md-5/bungeecord-api/latest/",
-                        "net.md_5.bungee.chat.TranslationRegistry$TranslationProvider" }
+                        "net.md_5.bungee.chat.TranslationRegistry$TranslationProvider" },
+                { "java.util", "https://docs.oracle.com/javase/8/docs/api/", "java.util.Collection",
+                        "java.util.Comparator", "java.util.Deque",
+                        "java.util.Enumeration", "java.util.EventListener", "java.util.Formattable",
+                        "java.util.Iterator", "java.util.List", "java.util.ListIterator", "java.util.Map",
+                        "java.util.Map$Entry", "java.util.NavigableMap", "java.util.NavigableSet", "java.util.Observer",
+                        "java.util.PrimitiveIterator", "java.util.PrimitiveIterator$OfDouble",
+                        "java.util.PrimitiveIterator$OfInt", "java.util.PrimitiveIterator$OfLong", "java.util.Queue",
+                        "java.util.RandomAccess", "java.util.Set", "java.util.SortedMap", "java.util.SortedSet",
+                        "java.util.Spliterator", "java.util.Spliterator$OfDouble", "java.util.Spliterator$OfInt",
+                        "java.util.Spliterator$OfLong", "java.util.Spliterator$OfPrimitive",
+                        "java.util.AbstractCollection", "java.util.AbstractList", "java.util.AbstractMap",
+                        "java.util.AbstractMap$SimpleEntry", "java.util.AbstractMap$SimpleImmutableEntry",
+                        "java.util.AbstractQueue", "java.util.AbstractSequentialList", "java.util.AbstractSet",
+                        "java.util.ArrayDeque", "java.util.ArrayList", "java.util.Arrays", "java.util.Base64",
+                        "java.util.Base64$Decoder", "java.util.Base64$Encoder", "java.util.BitSet",
+                        "java.util.Calendar", "java.util.Calendar$Builder", "java.util.Collections",
+                        "java.util.Currency", "java.util.Date", "java.util.Dictionary",
+                        "java.util.DoubleSummaryStatistics", "java.util.EnumMap", "java.util.EnumSet",
+                        "java.util.EventListenerProxy", "java.util.EventObject", "java.util.FormattableFlags",
+                        "java.util.Formatter", "java.util.GregorianCalendar", "java.util.HashMap",
+                        "java.util.HashSet",
+                        "java.util.Hashtable", "java.util.IdentityHashMap", "java.util.IntSummaryStatistics",
+                        "java.util.LinkedHashMap", "java.util.LinkedHashSet", "java.util.LinkedList",
+                        "java.util.ListResourceBundle", "java.util.Locale", "java.util.Locale$Builder",
+                        "java.util.Locale$LanguageRange", "java.util.LongSummaryStatistics", "java.util.Objects",
+                        "java.util.Observable", "java.util.Optional", "java.util.OptionalDouble",
+                        "java.util.OptionalInt", "java.util.OptionalLong", "java.util.PriorityQueue",
+                        "java.util.Properties", "java.util.PropertyPermission", "java.util.PropertyResourceBundle",
+                        "java.util.Random", "java.util.ResourceBundle", "java.util.ResourceBundle$Control",
+                        "java.util.Scanner", "java.util.ServiceLoader", "java.util.SimpleTimeZone",
+                        "java.util.Spliterators", "java.util.Spliterators$AbstractDoubleSpliterator",
+                        "java.util.Spliterators$AbstractIntSpliterator",
+                        "java.util.Spliterators$AbstractLongSpliterator", "java.util.Spliterators$AbstractSpliterator",
+                        "java.util.SplittableRandom", "java.util.Stack", "java.util.StringJoiner",
+                        "java.util.StringTokenizer", "java.util.Timer", "java.util.TimerTask", "java.util.TimeZone",
+                        "java.util.TreeMap", "java.util.TreeSet", "java.util.UUID", "java.util.Vector",
+                        "java.util.WeakHashMap", "java.util.regex.Pattern", "java.util.logging.Filter",
+                        "java.util.logging.LoggingMXBean", "java.util.logging.ConsoleHandler",
+                        "java.util.logging.ErrorManager", "java.util.logging.FileHandler",
+                        "java.util.logging.Formatter", "java.util.logging.Handler", "java.util.logging.Level",
+                        "java.util.logging.Logger", "java.util.logging.LoggingPermission",
+                        "java.util.logging.LogManager", "java.util.logging.LogRecord",
+                        "java.util.logging.MemoryHandler", "java.util.logging.SimpleFormatter",
+                        "java.util.logging.SocketHandler", "java.util.logging.StreamHandler",
+                        "java.util.logging.XMLFormatter",
+                        "java.util.random.RandomGenerator",
+                        "java.util.random.RandomGenerator$ArbitrarilyJumpableGenerator",
+                        "java.util.random.RandomGenerator$JumpableGenerator",
+                        "java.util.random.RandomGenerator$LeapableGenerator",
+                        "java.util.random.RandomGenerator$SplittableGenerator",
+                        "java.util.random.RandomGenerator$StreamableGenerator",
+                        "java.util.random.RandomGeneratorFactory",
+                        "java.util.Iterator"
+                },
 
         };
-        HashMap<String, Object> parsed_packages = new HashMap<>();
+        ConcurrentHashMap<String, Object> parsed_packages = new ConcurrentHashMap<>();
 
         for (String[] pkg : packages) {
             String doclink = new String();
@@ -145,33 +153,58 @@ public class App {
         dest.close();
     }
 
-    public static HashMap<String, HashMap<String, Object>> packageMap(String packageName, String doclink,
-            String[] lostImports, WebScraper webScraper) {
+    public static ConcurrentHashMap<String, ConcurrentHashMap<String, Object>> packageMap(String packageName,
+            String doclink,
+            String[] lostImports, WebScraper webScraper) throws InterruptedException {
         Reflections reflections = new Reflections(packageName, new SubTypesScanner(false));
-        HashMap<String, HashMap<String, Object>> all = new HashMap<>();
+        ConcurrentHashMap<String, ConcurrentHashMap<String, Object>> all = new ConcurrentHashMap<>();
+
+        ConcurrentLinkedQueue<ParsedClass> classes = new ConcurrentLinkedQueue<ParsedClass>();
+        ConcurrentLinkedQueue<ParsedEnum> enums = new ConcurrentLinkedQueue<ParsedEnum>();
 
         // =======
         // CLASSES
         // =======
-        ArrayList<ParsedClass> classes = new ArrayList<ParsedClass>();
-        for (Class<? extends Object> cls : reflections.getSubTypesOf(Object.class)) {
+        var types = reflections.getSubTypesOf(Object.class);
+
+        List<Callable<Boolean>> callableTasks = new ArrayList<>();
+        for (Class<? extends Object> cls : types) {
             if ((cls.getModifiers() & Modifier.PUBLIC) != Modifier.PUBLIC) {
                 continue;
             }
-            classes.add(new ParsedClass(cls, doclink, cls.getPackageName(), webScraper, true));
+            Callable callableTask = () -> {
+                if (cls.getEnumConstants() != null) {
+                    for (Object o : cls.getEnumConstants()) {
+                        ParsedEnum e = new ParsedEnum((Enum<?>) o, doclink, packageName, webScraper);
+                        String name = cls.getSimpleName() + "$" + e.name;
+                        e.name = name;
+                        enums.add(e);
+                    }
+                }
+                classes.add(new ParsedClass(cls, doclink, cls.getPackageName(), webScraper, true));
+                return false;
+            };
+            callableTasks.add(callableTask);
         }
         for (String importStr : lostImports) {
-            Class<?> what;
-            try {
-                what = Class.forName(importStr);
-                classes.add(new ParsedClass(what, doclink, what.getPackageName(), webScraper, true));
-            } catch (ClassNotFoundException e) {
-                e.printStackTrace();
-                System.exit(1);
-            }
+            Callable callableTask = () -> {
+                Class<?> what;
+                try {
+                    what = Class.forName(importStr);
+                    classes.add(new ParsedClass(what, doclink, what.getPackageName(), webScraper, true));
+                } catch (ClassNotFoundException e) {
+                    e.printStackTrace();
+                    System.exit(1);
+                }
+                return false;
+            };
+            callableTasks.add(callableTask);
         }
+        ExecutorService executorService = Executors.newFixedThreadPool(cores - 2);
+        executorService.invokeAll(callableTasks);
+        executorService.shutdown();
 
-        HashMap<String, ParsedClass> classes_part_2 = new HashMap<>();
+        ConcurrentHashMap<String, ParsedClass> classes_part_2 = new ConcurrentHashMap<>();
 
         classes.forEach(c -> {
             classes_part_2.put(c.packageName + "." + c.name, c);
@@ -180,7 +213,7 @@ public class App {
         classes_part_2.keySet().forEach(c -> {
             ParsedClass cls = classes_part_2.get(c);
             if (all.get(cls.packageName) == null) {
-                all.put(cls.packageName, new HashMap<>());
+                all.put(cls.packageName, new ConcurrentHashMap<>());
             }
             all.get(cls.packageName).put(c.replace(cls.packageName + ".", ""), cls);
         });
@@ -192,7 +225,12 @@ public class App {
         for (Class<?> e : reflections.getSubTypesOf(Enum.class)) {
             try {
                 if (e.getName().contains("$")) {
-                    continue;
+                    if (e.getName().contains("Action")) {
+                        // Then it's some class in bungee.
+                        // We're leaving this one unbound due to another bug that I'll fix later.
+                        continue;
+                    }
+
                 }
                 Method valueOf = e.getDeclaredMethod("valueOf", String.class);
                 String value = e.getEnumConstants()[0].toString();
@@ -203,19 +241,23 @@ public class App {
             } catch (InvocationTargetException ignored) {
             } catch (IllegalAccessException | IllegalArgumentException
                     | NoSuchMethodException | SecurityException e1) {
-                String value = e.getEnumConstants()[0].toString();
-                System.out.println(value);
-                e1.printStackTrace();
+                if (e.getEnumConstants() != null) {
+                    String value = e.getEnumConstants()[0].toString();
+                    System.out.println(value);
+                    e1.printStackTrace();
+                } else {
+                    e1.printStackTrace();
+                }
+
             }
         }
         ;
 
-        ArrayList<ParsedEnum> enums = new ArrayList<ParsedEnum>();
         for (Enum<?> e : enum_objects) {
             enums.add(new ParsedEnum(e, doclink, packageName, webScraper));
         }
 
-        HashMap<String, ParsedEnum> enums_part_2 = new HashMap<>();
+        ConcurrentHashMap<String, ParsedEnum> enums_part_2 = new ConcurrentHashMap<>();
 
         enums.forEach(c -> {
             enums_part_2.put(c.name, c);
@@ -224,7 +266,7 @@ public class App {
         enums_part_2.keySet().forEach(c -> {
             ParsedEnum e = enums_part_2.get(c);
             if (all.get(e.packageName) == null) {
-                all.put(e.packageName, new HashMap<>());
+                all.put(e.packageName, new ConcurrentHashMap<>());
             }
             all.get(e.packageName).put(c, e);
         });

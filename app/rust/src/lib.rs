@@ -3,9 +3,8 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::Path,
+    sync::Arc,
 };
-
-use rustc_hash::FxHashMap as HashMap;
 
 use jni::{
     objects::{JClass, JObject, JObjectArray, JString},
@@ -13,23 +12,18 @@ use jni::{
 };
 use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
-use parking_lot::Mutex;
 use phf::phf_map;
 use regex::Regex;
 use scraper::{html::Html, ElementRef, Selector};
 use tokio::runtime::{self, Runtime};
 
 pub struct Parser {
-    parsed_generics: Mutex<HashMap<String, Vec<String>>>,
-    parsed_method_generics: Mutex<HashMap<String, Vec<String>>>,
     runtime: Runtime,
 }
 
 impl Parser {
     pub fn new() -> Self {
         Self {
-            parsed_generics: Mutex::new(HashMap::default()),
-            parsed_method_generics: Mutex::new(HashMap::default()),
             runtime: runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
@@ -54,19 +48,12 @@ impl Parser {
         env: &mut JNIEnv<'a>,
         cls: JClass<'a>,
     ) -> Result<Option<Html>, Box<dyn Error>> {
-        self.runtime
-            .block_on(async { self.get_url_async(&module_name, env, cls).await })
-    }
-    pub async fn get_url_async<'a>(
-        &self,
-        module_name: &String,
-        env: &mut JNIEnv<'a>,
-        cls: JClass<'a>,
-    ) -> Result<Option<Html>, Box<dyn Error>> {
         match DOC_LINKS.get(&module_name) {
             Some(doclink) => {
                 let class_name = &self.class_get_name(env, &cls)?;
                 let url = format!("{}{}.html", doclink, class_name.replace(".", "/"));
+                println!("{}", url);
+
                 let url_filename = NON_ALPHABET.replace_all(&url, "").to_string();
                 let url_path =
                     Path::join(Path::new(".javadocCache"), format!("{}.txt", url_filename));
@@ -78,11 +65,13 @@ impl Parser {
                     }
                     Err(err) => {
                         if let std::io::ErrorKind::NotFound = err.kind() {
-                            let req = reqwest::get(url).await?;
-                            let mut f = File::create(url_path)?;
-                            let text = &req.text().await?;
-                            f.write(text.as_bytes())?;
-                            Ok(Some(Html::parse_document(text)))
+                            self.runtime.block_on(async {
+                                let req = reqwest::get(&url).await?;
+                                let mut f = File::create(url_path)?;
+                                let text = &req.text().await?;
+                                f.write(text.as_bytes())?;
+                                Ok(Some(Html::parse_document(text)))
+                            })
                         } else {
                             Err(Box::new(err))
                         }
@@ -101,39 +90,33 @@ impl Parser {
         module_name: String,
         _method_name: Option<String>,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let mut parsed_generics = self.parsed_generics.lock();
-
         let class_name = &self.class_get_name(env, &cls)?;
         let id = format!("{}", class_name);
-        if let Some(g) = parsed_generics.get(&id) {
-            Ok(g.to_vec())
-        } else {
-            let doc = self.get_url(&module_name, env, cls).unwrap();
-            if let None = doc {
-                return Ok(Vec::new());
-            };
-            let doc = doc.unwrap();
-            let mut names = Vec::new();
-            let sel = Selector::parse(".title").unwrap();
-            let mut ele = doc.select(&sel);
-            if let Some(title) = ele.next() {
-                if let Some(cap) = PATTERN_GENERICS.captures(&element_get_text(title)) {
-                    let fuck = cap
-                        .get(2)
-                        .unwrap()
-                        .as_str()
-                        .replace("<", "")
-                        .replace(">", "");
-                    let mut ok = fuck
-                        .split(",")
-                        .map(|f| f.to_string())
-                        .collect::<Vec<String>>();
-                    names.append(&mut ok);
-                }
+        let doc = self.get_url(&module_name, env, cls).unwrap();
+        if let None = doc {
+            return Ok(Vec::new());
+        };
+        let doc = doc.unwrap();
+        let mut names = Vec::new();
+        let sel = Selector::parse(".title").unwrap();
+        let mut ele = doc.select(&sel);
+        if let Some(title) = ele.next() {
+            if let Some(cap) = PATTERN_GENERICS.captures(&element_get_text(title)) {
+                let fuck = cap
+                    .get(2)
+                    .unwrap()
+                    .as_str()
+                    .replace("<", "")
+                    .replace(">", "");
+                let mut ok = fuck
+                    .split(",")
+                    .map(|f| f.to_string())
+                    .collect::<Vec<String>>();
+                names.append(&mut ok);
             }
-            parsed_generics.insert(id, names.clone());
-            Ok(names)
         }
+        //self.parsed_generics.write().insert(id, names.clone());
+        Ok(names)
     }
 
     /// Get the generics for a method.
@@ -144,63 +127,59 @@ impl Parser {
         module_name: String,
         method_name: Option<String>,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let mut parsed_method_generics = self.parsed_method_generics.lock();
-
         let method_name = method_name.unwrap();
 
         let class_name = &self.class_get_name(env, &cls)?;
         let id = format!("{}.{}", class_name, method_name);
-        if let Some(g) = parsed_method_generics.get(&id) {
-            Ok(g.to_vec())
-        } else {
-            let doc = self.get_url(&module_name, env, cls).unwrap();
-            if let None = doc {
-                return Ok(Vec::new());
-            };
-            let doc = doc.unwrap();
+        let doc = self.get_url(&module_name, env, cls).unwrap();
+        if let None = doc {
+            return Ok(Vec::new());
+        };
+        let doc = doc.unwrap();
 
-            let rows_class = Selector::parse("tr").unwrap();
-            let code_class = Selector::parse("code").unwrap();
-            let mut rows = doc.select(&rows_class);
-            let mut names = Vec::new();
-            while let Some(row) = rows.next() {
-                let col_first = element_get_class(row, ".colFirst");
-                let col_last = element_get_class(row, ".colLast");
-                if let Some(first) = col_first {
-                    if let Some(last) = col_last {
-                        if let Some(member_name_link) = element_get_class(last, ".memberNameLink") {
-                            if !element_get_text(member_name_link).contains(&method_name) {
-                                continue;
-                            }
-                        } else {
+        let rows_class = Selector::parse("tr").unwrap();
+        let code_class = Selector::parse("code").unwrap();
+        let mut rows = doc.select(&rows_class);
+        let mut names = Vec::new();
+        while let Some(row) = rows.next() {
+            let col_first = element_get_class(row, ".colFirst");
+            let col_last = element_get_class(row, ".colLast");
+            if let Some(first) = col_first {
+                if let Some(last) = col_last {
+                    if let Some(member_name_link) = element_get_class(last, ".memberNameLink") {
+                        if !element_get_text(member_name_link).contains(&method_name) {
                             continue;
                         }
+                    } else {
+                        continue;
                     }
-                    let code = first.select(&code_class).collect::<Vec<ElementRef>>();
-                    if let Some(c) = code.get(0) {
-                        if !&c.inner_html().contains("<") {
-                            continue;
-                        }
-                        if let Some(cap) = METHOD_PATTERN_GENERICS.captures(&element_get_text(*c)) {
-                            let fuck = cap
-                                .get(2)
-                                .unwrap()
-                                .as_str()
-                                .replace("<", "")
-                                .replace(">", "");
-                            let mut ok = fuck
-                                .split(",")
-                                .map(|f| f.to_string())
-                                .collect::<Vec<String>>();
-                            names.append(&mut ok);
-                            break;
-                        }
+                }
+                let code = first.select(&code_class).collect::<Vec<ElementRef>>();
+                if let Some(c) = code.get(0) {
+                    if !&c.inner_html().contains("<") {
+                        continue;
+                    }
+                    if let Some(cap) = METHOD_PATTERN_GENERICS.captures(&element_get_text(*c)) {
+                        let fuck = cap
+                            .get(2)
+                            .unwrap()
+                            .as_str()
+                            .replace("<", "")
+                            .replace(">", "");
+                        let mut ok = fuck
+                            .split(",")
+                            .map(|f| f.to_string())
+                            .collect::<Vec<String>>();
+                        names.append(&mut ok);
+                        break;
                     }
                 }
             }
-            parsed_method_generics.insert(id, names.clone());
-            Ok(names)
         }
+        //self.parsed_method_generics
+        //    .write()
+        //     .insert(id, names.clone());
+        Ok(names)
     }
 
     /// Get the comment block for a class
@@ -236,6 +215,9 @@ impl Parser {
                 comment += comm.inner_html().as_str();
             }
         }
+        /*self.parsed_comments
+        .write()
+        .insert(module_name, comment.clone());*/
         Ok(comment)
     }
 
