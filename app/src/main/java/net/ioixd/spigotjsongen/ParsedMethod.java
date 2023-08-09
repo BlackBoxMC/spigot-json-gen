@@ -25,8 +25,10 @@ public class ParsedMethod {
 
     public boolean isDefault;
 
+    public String comment;
+
     public ParsedMethod(Method method, Class<?> upperClass, String upperDoclink, String[] upperGenerics,
-            WebScraper webScraper) {
+            WebScraper webScraper, boolean toplevel) {
         this.name = method.getName();
         this.exceptionTypes = (ArrayList<String>) new ArrayList<>(Arrays.asList(method.getExceptionTypes())).stream()
                 .map(f -> {
@@ -51,30 +53,40 @@ public class ParsedMethod {
 
         this.returnType = method.getReturnType().getTypeName();
 
-        try {
-            this.generics = webScraper.getMethodGenerics(upperDoclink, upperClass,
-                    method.getName());
-            if (this.generics.length >= 1) {
-                System.out.println(upperClass.getName() + "." + this.name + ", " +
-                        Arrays.toString(this.generics));
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        var upperGenerics_ = Arrays.asList(upperGenerics);
-        ArrayList<String> generics_ = new ArrayList<>();
-        for (String gen : this.generics) {
-            if (!upperGenerics_.contains(gen)) {
-                generics_.add(gen);
+        if (toplevel) {
+            if (!method.getName().contains("$")) {
+                this.comment = webScraper.getMethodComment(upperDoclink, upperClass, method.getName());
+            } else {
+                System.out.println(method.getName());
             }
         }
-        var generics__ = new String[generics_.size()];
-        for (int i = 0; i < generics_.size(); i++) {
-            generics__[i] = generics_.get(i);
-        }
-        this.generics = generics__;
 
+        /*
+         * try {
+         * this.generics = webScraper.getMethodGenerics(upperDoclink, upperClass,
+         * method.getName());
+         * if (this.generics.length >= 1) {
+         * System.out.println(upperClass.getName() + "." + this.name + ", " +
+         * Arrays.toString(this.generics));
+         * }
+         * } catch (Exception e) {
+         * e.printStackTrace();
+         * }
+         * 
+         * 
+         * var upperGenerics_ = Arrays.asList(upperGenerics);
+         * ArrayList<String> generics_ = new ArrayList<>();
+         * for (String gen : this.generics) {
+         * if (!upperGenerics_.contains(gen)) {
+         * generics_.add(gen);
+         * }
+         * }
+         * var generics__ = new String[generics_.size()];
+         * for (int i = 0; i < generics_.size(); i++) {
+         * generics__[i] = generics_.get(i);
+         * }
+         * this.generics = generics__;
+         */
         this.annotations = new ArrayList<>(Arrays.asList());
         for (Annotation annotation : method.getAnnotations()) {
             for (Method method_ : annotation.annotationType().getDeclaredMethods()) {

@@ -11,4 +11,7 @@ public class WebScraper {
 
     public native String[] getMethodGenerics(String moduleName, Class<?> cls, String methodName) throws Exception;
 
+    public native String getComment(String moduleName, Class<?> cls);
+
+    public native String getMethodComment(String moduleName, Class<?> cls, String methodName);
 }

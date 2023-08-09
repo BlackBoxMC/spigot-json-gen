@@ -51,9 +51,9 @@ public class ParsedEnum {
         }
         this.ordinal = e.ordinal();
 
-        if (e.getClass().getDeclaredMethods().length >= 1) {
+        if (e.getClass().getMethods().length >= 1) {
             this.methods = new ArrayList<ParsedMethod>();
-            for (Method m : e.getClass().getDeclaredMethods()) {
+            for (Method m : e.getClass().getMethods()) {
                 String[] parts = e.getClass().getPackageName().split(".");
                 if (parts.length >= 2) {
                     String[] fuckyou = new String[] {
@@ -61,7 +61,8 @@ public class ParsedEnum {
                             parts[1]
                     };
                     this.methods.add(
-                            new ParsedMethod(m, e.getClass(), String.join(".", fuckyou), new String[] {}, webScraper));
+                            new ParsedMethod(m, e.getClass(), String.join(".", fuckyou), new String[] {}, webScraper,
+                                    true));
                 }
             }
         }
@@ -76,7 +77,7 @@ public class ParsedEnum {
                 if ((cl.getModifiers() & Modifier.PUBLIC) != Modifier.PUBLIC) {
                     continue;
                 }
-                this.classes.add(new ParsedClass(cl, doclink, packageName, webScraper));
+                this.classes.add(new ParsedClass(cl, doclink, packageName, webScraper, false));
             }
         }
     }

@@ -72,7 +72,8 @@ public class App {
                         "java.util.random.RandomGenerator$LeapableGenerator",
                         "java.util.random.RandomGenerator$SplittableGenerator",
                         "java.util.random.RandomGenerator$StreamableGenerator",
-                        "java.util.random.RandomGeneratorFactory"
+                        "java.util.random.RandomGeneratorFactory",
+                        "java.util.Iterator"
                 },
                 { "org.bukkit",
                         "https://hub.spigotmc.org/javadocs/spigot/",
@@ -157,13 +158,13 @@ public class App {
             if ((cls.getModifiers() & Modifier.PUBLIC) != Modifier.PUBLIC) {
                 continue;
             }
-            classes.add(new ParsedClass(cls, doclink, cls.getPackageName(), webScraper));
+            classes.add(new ParsedClass(cls, doclink, cls.getPackageName(), webScraper, true));
         }
         for (String importStr : lostImports) {
             Class<?> what;
             try {
                 what = Class.forName(importStr);
-                classes.add(new ParsedClass(what, doclink, what.getPackageName(), webScraper));
+                classes.add(new ParsedClass(what, doclink, what.getPackageName(), webScraper, true));
             } catch (ClassNotFoundException e) {
                 e.printStackTrace();
                 System.exit(1);

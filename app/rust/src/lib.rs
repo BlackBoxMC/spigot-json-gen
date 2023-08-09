@@ -93,6 +93,7 @@ impl Parser {
         }
     }
 
+    /// Get the generics for a class.
     pub fn get_generics<'a>(
         &self,
         env: &mut JNIEnv<'a>,
@@ -135,6 +136,7 @@ impl Parser {
         }
     }
 
+    /// Get the generics for a method.
     pub fn get_method_generics<'a>(
         &self,
         env: &mut JNIEnv<'a>,
@@ -199,6 +201,70 @@ impl Parser {
             parsed_method_generics.insert(id, names.clone());
             Ok(names)
         }
+    }
+
+    /// Get the comment block for a class
+    pub fn get_comment<'a>(
+        &self,
+        env: &mut JNIEnv<'a>,
+        cls: JClass<'a>,
+        module_name: String,
+    ) -> Result<String, Box<dyn Error>> {
+        let class_name = &self.class_get_name(env, &cls)?;
+        let id = format!("{}", class_name);
+        let doc = self.get_url(&module_name, env, cls).unwrap();
+        if let None = doc {
+            return Ok("".into());
+        };
+        let doc = doc.unwrap();
+        let sel1 = Selector::parse(".description").unwrap();
+        let mut ele1 = doc.select(&sel1);
+        let mut comment = String::new();
+        while let Some(desc) = ele1.next() {
+            let com = Selector::parse(".block").unwrap();
+            let mut ele2 = desc.select(&com);
+            while let Some(comm) = ele2.next() {
+                comment += comm.inner_html().as_str();
+            }
+        }
+        let sel1 = Selector::parse("#class-description").unwrap();
+        let mut ele1 = doc.select(&sel1);
+        while let Some(desc) = ele1.next() {
+            let com = Selector::parse(".block").unwrap();
+            let mut ele2 = desc.select(&com);
+            while let Some(comm) = ele2.next() {
+                comment += comm.inner_html().as_str();
+            }
+        }
+        Ok(comment)
+    }
+
+    /// Get the comment block for a method
+    pub fn get_method_comment<'a>(
+        &self,
+        env: &mut JNIEnv<'a>,
+        cls: JClass<'a>,
+        module_name: String,
+        method_name: String,
+    ) -> Result<String, Box<dyn Error>> {
+        let class_name = &self.class_get_name(env, &cls)?;
+        let mut comment = String::new();
+
+        let doc = self.get_url(&module_name, env, cls).unwrap();
+        if let None = doc {
+            return Ok("".into());
+        };
+        let doc = doc.unwrap();
+        let sel1 = Selector::parse(
+            format!("section[id^={}] div:not(.member-signature)", method_name).as_str(),
+        )
+        .unwrap();
+        let mut ele1 = doc.select(&sel1);
+
+        while let Some(desc) = ele1.next() {
+            comment += desc.inner_html().as_str();
+        }
+        Ok(comment)
     }
 }
 
@@ -279,6 +345,23 @@ pub fn get_method_generics<'a>(
     PARSER.get_method_generics(env, cls, module_name, method_name)
 }
 
+pub fn get_comment<'a>(
+    env: &mut JNIEnv<'a>,
+    cls: JClass<'a>,
+    module_name: String,
+) -> Result<String, Box<dyn Error>> {
+    PARSER.get_comment(env, cls, module_name)
+}
+
+pub fn get_method_comment<'a>(
+    env: &mut JNIEnv<'a>,
+    cls: JClass<'a>,
+    module_name: String,
+    method_name: String,
+) -> Result<String, Box<dyn Error>> {
+    PARSER.get_method_comment(env, cls, module_name, method_name)
+}
+
 #[no_mangle]
 pub extern "system" fn Java_net_ioixd_spigotjsongen_WebScraper_getGenerics<'a>(
     mut env: JNIEnv<'a>,
@@ -321,4 +404,45 @@ pub extern "system" fn Java_net_ioixd_spigotjsongen_WebScraper_getMethodGenerics
         Some(method_name),
         get_method_generics,
     )
+}
+
+#[no_mangle]
+pub extern "system" fn Java_net_ioixd_spigotjsongen_WebScraper_getComment<'a>(
+    mut env: JNIEnv<'a>,
+    _this: JObject,
+    module_name_raw: JString<'a>,
+    cls: JClass<'a>,
+) -> JString<'a> {
+    let module_name = env
+        .get_string(&module_name_raw)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+
+    let st = get_comment(&mut env, cls, module_name).unwrap();
+    env.new_string(st).unwrap()
+}
+
+#[no_mangle]
+pub extern "system" fn Java_net_ioixd_spigotjsongen_WebScraper_getMethodComment<'a>(
+    mut env: JNIEnv<'a>,
+    _this: JObject,
+    module_name_raw: JString<'a>,
+    cls: JClass<'a>,
+    method_name_raw: JString<'a>,
+) -> JString<'a> {
+    let module_name = env
+        .get_string(&module_name_raw)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+
+    let method_name = env
+        .get_string(&method_name_raw)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+
+    let st = get_method_comment(&mut env, cls, module_name, method_name).unwrap();
+    env.new_string(st).unwrap()
 }
