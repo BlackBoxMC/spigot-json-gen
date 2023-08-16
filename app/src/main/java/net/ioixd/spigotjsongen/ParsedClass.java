@@ -2,6 +2,7 @@ package net.ioixd.spigotjsongen;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +33,9 @@ public class ParsedClass {
     public ArrayList<String> annotations = new ArrayList<String>();
 
     public String comment;
+
+    public ArrayList<String> values = new ArrayList<String>();
+    public int ordinal;
 
     ParsedClass(Class<?> cls, String doclink, String packageName, WebScraper webScraper, boolean toplevel) {
         this.packageName = cls.getPackageName();
@@ -90,11 +94,40 @@ public class ParsedClass {
          * }
          */
 
-        if (cls.getMethods().length >= 1) {
+        Method[] methods;
+
+        if (cls.isEnum()) {
+            methods = cls.getDeclaredMethods();
+        } else {
+            methods = cls.getMethods();
+        }
+
+        if (methods.length >= 1) {
             this.methods = new ArrayList<ParsedMethod>();
-            for (Method m : cls.getMethods()) {
+            for (Method m : methods) {
                 this.methods
                         .add(new ParsedMethod(m, cls, String.join(".", fuckyou), this.generics, webScraper, toplevel));
+            }
+        }
+
+        this.isEnum = cls.isEnum();
+        if (this.isEnum) {
+            try {
+                Method valueOf = cls.getDeclaredMethod("valueOf", String.class);
+                String value = cls.getEnumConstants()[0].toString();
+                if (value.toUpperCase() != value) {
+                    value = value.replaceAll("([A-Z])", "_$1").toUpperCase();
+                }
+                Enum<?> en = (Enum<?>) valueOf.invoke(null, value);
+                var ok = new ParsedEnum(en, doclink, packageName, webScraper);
+                this.values = ok.values;
+                this.ordinal = ok.ordinal;
+            } catch (IllegalAccessException | IllegalArgumentException | NoSuchMethodException
+                    | InvocationTargetException e) {
+                e.printStackTrace();
+                this.isEnum = false;
+                this.values = null;
+                this.ordinal = 0;
             }
         }
 

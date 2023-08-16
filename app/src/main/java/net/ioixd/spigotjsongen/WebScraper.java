@@ -13,5 +13,7 @@ public class WebScraper {
 
     public native String getComment(String moduleName, Class<?> cls);
 
-    public native String getMethodComment(String moduleName, Class<?> cls, String methodName);
+    public native String getMethodComment(String moduleName, Class<?> cls, String methodName, String wantedArgs);
+
+    public native String getAnnotations(String moduleName, Class<?> cls, String methodName, String wantedArgs);
 }

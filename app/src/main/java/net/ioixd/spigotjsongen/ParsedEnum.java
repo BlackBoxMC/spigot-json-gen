@@ -51,9 +51,9 @@ public class ParsedEnum {
         }
         this.ordinal = e.ordinal();
 
-        if (e.getClass().getMethods().length >= 1) {
+        if (e.getClass().getDeclaredMethods().length >= 1) {
             this.methods = new ArrayList<ParsedMethod>();
-            for (Method m : e.getClass().getMethods()) {
+            for (Method m : e.getClass().getDeclaredMethods()) {
                 String[] parts = e.getClass().getPackageName().split(".");
                 if (parts.length >= 2) {
                     String[] fuckyou = new String[] {

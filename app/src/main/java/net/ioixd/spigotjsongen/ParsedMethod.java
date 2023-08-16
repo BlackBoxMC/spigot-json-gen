@@ -5,6 +5,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class ParsedMethod {
@@ -18,7 +19,7 @@ public class ParsedMethod {
     public ArrayList<String[]> parameters = new ArrayList<String[]>();
     public ArrayList<String> typeParameters = new ArrayList<String>();
 
-    public ArrayList<String[]> annotations = new ArrayList<String[]>();
+    public ArrayList<String> annotations = new ArrayList<String>();
     public String genericReturnType;
 
     public String returnType;
@@ -53,12 +54,23 @@ public class ParsedMethod {
 
         this.returnType = method.getReturnType().getTypeName();
 
+        List<String> wantedStrings = Arrays.asList(method.getParameterTypes()).stream().map(f -> {
+            return f.getName();
+        }).collect(Collectors.toList());
         if (toplevel) {
             if (!method.getName().contains("$")) {
-                this.comment = webScraper.getMethodComment(upperDoclink, upperClass, method.getName());
+                this.comment = webScraper.getMethodComment(upperDoclink, upperClass, method.getName(),
+                        String.join(",", wantedStrings));
             } else {
                 System.out.println(method.getName());
             }
+        }
+
+        if (!method.getName().contains("$")) {
+            annotations.addAll(Arrays.asList(webScraper.getAnnotations(upperDoclink, upperClass, method.getName(),
+                    String.join(",", wantedStrings)).split(",")));
+        } else {
+            System.out.println(method.getName());
         }
 
         /*
@@ -87,18 +99,6 @@ public class ParsedMethod {
          * }
          * this.generics = generics__;
          */
-        this.annotations = new ArrayList<>(Arrays.asList());
-        for (Annotation annotation : method.getAnnotations()) {
-            for (Method method_ : annotation.annotationType().getDeclaredMethods()) {
-                Object value;
-                try {
-                    value = method_.invoke(annotation, (Object[]) null);
-                    this.annotations.add(new String[] { method_.getName(), value.toString() });
-                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
 
         this.isDefault = method.isDefault();
     }

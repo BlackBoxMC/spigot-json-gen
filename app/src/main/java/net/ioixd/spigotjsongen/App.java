@@ -126,8 +126,41 @@ public class App {
                         "java.util.random.RandomGenerator$SplittableGenerator",
                         "java.util.random.RandomGenerator$StreamableGenerator",
                         "java.util.random.RandomGeneratorFactory",
-                        "java.util.Iterator"
+                        "java.util.function.BiConsumer", "java.util.function.BiFunction",
+                        "java.util.function.BinaryOperator",
+                        "java.util.function.BiPredicate", "java.util.function.BooleanSupplier",
+                        "java.util.function.Consumer",
+                        "java.util.function.DoubleBinaryOperator", "java.util.function.DoubleConsumer",
+                        "java.util.function.DoubleFunction",
+                        "java.util.function.DoublePredicate", "java.util.function.DoubleSupplier",
+                        "java.util.function.DoubleToIntFunction",
+                        "java.util.function.DoubleToLongFunction", "java.util.function.DoubleUnaryOperator",
+                        "java.util.function.Function",
+                        "java.util.function.IntBinaryOperator", "java.util.function.IntConsumer",
+                        "java.util.function.IntFunction",
+                        "java.util.function.IntPredicate", "java.util.function.IntSupplier",
+                        "java.util.function.IntToDoubleFunction",
+                        "java.util.function.IntToLongFunction", "java.util.function.IntUnaryOperator",
+                        "java.util.function.LongBinaryOperator",
+                        "java.util.function.LongConsumer", "java.util.function.LongFunction",
+                        "java.util.function.LongPredicate",
+                        "java.util.function.LongSupplier", "java.util.function.LongToDoubleFunction",
+                        "java.util.function.LongToIntFunction",
+                        "java.util.function.LongUnaryOperator", "java.util.function.ObjDoubleConsumer",
+                        "java.util.function.ObjIntConsumer",
+                        "java.util.function.ObjLongConsumer", "java.util.function.Predicate",
+                        "java.util.function.Supplier",
+                        "java.util.function.ToDoubleBiFunction", "java.util.function.ToDoubleFunction",
+                        "java.util.function.ToIntBiFunction",
+                        "java.util.function.ToIntFunction", "java.util.function.ToLongBiFunction",
+                        "java.util.function.ToLongFunction",
+                        "java.util.function.UnaryOperator",
                 },
+                {
+                        "java.lang", "https://docs.oracle.com/javase/8/docs/api/", "java.lang.Boolean",
+                        "java.lang.Byte", "java.lang.Character", "java.lang.Double",
+                        "java.lang.Float", "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.String",
+                }
 
         };
         ConcurrentHashMap<String, Object> parsed_packages = new ConcurrentHashMap<>();
@@ -172,7 +205,7 @@ public class App {
             if ((cls.getModifiers() & Modifier.PUBLIC) != Modifier.PUBLIC) {
                 continue;
             }
-            Callable callableTask = () -> {
+            Callable<Boolean> callableTask = () -> {
                 if (cls.getEnumConstants() != null) {
                     for (Object o : cls.getEnumConstants()) {
                         ParsedEnum e = new ParsedEnum((Enum<?>) o, doclink, packageName, webScraper);
@@ -187,7 +220,7 @@ public class App {
             callableTasks.add(callableTask);
         }
         for (String importStr : lostImports) {
-            Callable callableTask = () -> {
+            Callable<Boolean> callableTask = () -> {
                 Class<?> what;
                 try {
                     what = Class.forName(importStr);
@@ -200,6 +233,40 @@ public class App {
             };
             callableTasks.add(callableTask);
         }
+        for (Class<?> e : reflections.getSubTypesOf(Enum.class)) {
+            Callable<Boolean> callableTask = () -> {
+                try {
+                    if (e.getName().contains("$")) {
+                        if (e.getName().contains("Action")) {
+                            // Then it's some class in bungee.
+                            // We're leaving this one unbound due to another bug that I'll fix later.
+                            return false;
+                        }
+
+                    }
+                    Method valueOf = e.getDeclaredMethod("valueOf", String.class);
+                    String value = e.getEnumConstants()[0].toString();
+                    if (value.toUpperCase() != value) {
+                        value = value.replaceAll("([A-Z])", "_$1").toUpperCase();
+                    }
+                    var en = (Enum<?>) valueOf.invoke(null, value);
+                    enums.add(new ParsedEnum(en, doclink, packageName, webScraper));
+                } catch (InvocationTargetException ignored) {
+                } catch (IllegalAccessException | IllegalArgumentException
+                        | NoSuchMethodException | SecurityException e1) {
+                    if (e.getEnumConstants() != null) {
+                        String value = e.getEnumConstants()[0].toString();
+                        System.out.println(value);
+                        e1.printStackTrace();
+                    } else {
+                        e1.printStackTrace();
+                    }
+                }
+                return false;
+            };
+            callableTasks.add(callableTask);
+        }
+        ;
         ExecutorService executorService = Executors.newFixedThreadPool(cores - 2);
         executorService.invokeAll(callableTasks);
         executorService.shutdown();
@@ -217,45 +284,6 @@ public class App {
             }
             all.get(cls.packageName).put(c.replace(cls.packageName + ".", ""), cls);
         });
-
-        // =======
-        // ENUMS
-        // =======
-        ArrayList<Enum<?>> enum_objects = new ArrayList<>();
-        for (Class<?> e : reflections.getSubTypesOf(Enum.class)) {
-            try {
-                if (e.getName().contains("$")) {
-                    if (e.getName().contains("Action")) {
-                        // Then it's some class in bungee.
-                        // We're leaving this one unbound due to another bug that I'll fix later.
-                        continue;
-                    }
-
-                }
-                Method valueOf = e.getDeclaredMethod("valueOf", String.class);
-                String value = e.getEnumConstants()[0].toString();
-                if (value.toUpperCase() != value) {
-                    value = value.replaceAll("([A-Z])", "_$1").toUpperCase();
-                }
-                enum_objects.add((Enum<?>) valueOf.invoke(null, value));
-            } catch (InvocationTargetException ignored) {
-            } catch (IllegalAccessException | IllegalArgumentException
-                    | NoSuchMethodException | SecurityException e1) {
-                if (e.getEnumConstants() != null) {
-                    String value = e.getEnumConstants()[0].toString();
-                    System.out.println(value);
-                    e1.printStackTrace();
-                } else {
-                    e1.printStackTrace();
-                }
-
-            }
-        }
-        ;
-
-        for (Enum<?> e : enum_objects) {
-            enums.add(new ParsedEnum(e, doclink, packageName, webScraper));
-        }
 
         ConcurrentHashMap<String, ParsedEnum> enums_part_2 = new ConcurrentHashMap<>();
 

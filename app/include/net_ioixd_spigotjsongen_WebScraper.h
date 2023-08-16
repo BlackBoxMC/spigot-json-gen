@@ -34,10 +34,18 @@ JNIEXPORT jstring JNICALL Java_net_ioixd_spigotjsongen_WebScraper_getComment
 /*
  * Class:     net_ioixd_spigotjsongen_WebScraper
  * Method:    getMethodComment
- * Signature: (Ljava/lang/String;Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/String;
+ * Signature: (Ljava/lang/String;Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_net_ioixd_spigotjsongen_WebScraper_getMethodComment
-  (JNIEnv *, jobject, jstring, jclass, jstring);
+  (JNIEnv *, jobject, jstring, jclass, jstring, jstring);
+
+/*
+ * Class:     net_ioixd_spigotjsongen_WebScraper
+ * Method:    getAnnotations
+ * Signature: (Ljava/lang/String;Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_net_ioixd_spigotjsongen_WebScraper_getAnnotations
+  (JNIEnv *, jobject, jstring, jclass, jstring, jstring);
 
 #ifdef __cplusplus
 }

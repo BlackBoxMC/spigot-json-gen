@@ -1,9 +1,10 @@
 use std::{
+    cell::RefCell,
+    collections::HashMap,
     error::Error,
     fs::File,
     io::{Read, Write},
     path::Path,
-    sync::Arc,
 };
 
 use jni::{
@@ -17,8 +18,12 @@ use regex::Regex;
 use scraper::{html::Html, ElementRef, Selector};
 use tokio::runtime::{self, Runtime};
 
+use parking_lot::ReentrantMutex;
+
 pub struct Parser {
     runtime: Runtime,
+    opened_files: ReentrantMutex<RefCell<HashMap<String, File>>>,
+    parsed_annotations: ReentrantMutex<RefCell<HashMap<String, String>>>,
 }
 
 impl Parser {
@@ -28,6 +33,8 @@ impl Parser {
                 .enable_all()
                 .build()
                 .unwrap(),
+            opened_files: ReentrantMutex::new(RefCell::new(HashMap::new())),
+            parsed_annotations: ReentrantMutex::new(RefCell::new(HashMap::new())),
         }
     }
     pub fn class_get_name<'a>(
@@ -51,12 +58,15 @@ impl Parser {
         match DOC_LINKS.get(&module_name) {
             Some(doclink) => {
                 let class_name = &self.class_get_name(env, &cls)?;
-                let url = format!("{}{}.html", doclink, class_name.replace(".", "/"));
-                println!("{}", url);
-
+                let url = format!(
+                    "{}{}.html",
+                    doclink,
+                    class_name.replace(".", "/").replace("$", ".")
+                );
                 let url_filename = NON_ALPHABET.replace_all(&url, "").to_string();
                 let url_path =
                     Path::join(Path::new(".javadocCache"), format!("{}.txt", url_filename));
+
                 match File::open(&url_path) {
                     Ok(mut file) => {
                         let mut buf = String::new();
@@ -90,8 +100,7 @@ impl Parser {
         module_name: String,
         _method_name: Option<String>,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let class_name = &self.class_get_name(env, &cls)?;
-        let id = format!("{}", class_name);
+        return Ok(Vec::new());
         let doc = self.get_url(&module_name, env, cls).unwrap();
         if let None = doc {
             return Ok(Vec::new());
@@ -127,10 +136,9 @@ impl Parser {
         module_name: String,
         method_name: Option<String>,
     ) -> Result<Vec<String>, Box<dyn Error>> {
+        return Ok(Vec::new());
         let method_name = method_name.unwrap();
 
-        let class_name = &self.class_get_name(env, &cls)?;
-        let id = format!("{}.{}", class_name, method_name);
         let doc = self.get_url(&module_name, env, cls).unwrap();
         if let None = doc {
             return Ok(Vec::new());
@@ -189,8 +197,6 @@ impl Parser {
         cls: JClass<'a>,
         module_name: String,
     ) -> Result<String, Box<dyn Error>> {
-        let class_name = &self.class_get_name(env, &cls)?;
-        let id = format!("{}", class_name);
         let doc = self.get_url(&module_name, env, cls).unwrap();
         if let None = doc {
             return Ok("".into());
@@ -221,6 +227,58 @@ impl Parser {
         Ok(comment)
     }
 
+    /// Get the arguments for a method
+    pub fn filter_method_with_args<'a>(
+        doc: &'a Html,
+        method_name: &'a String,
+        wanted_args: Vec<&'a str>,
+        mut f: impl FnMut(&'a Html, ElementRef<'a>) -> (),
+    ) {
+        let member_signature_cls =
+            Selector::parse(format!("section[id^={}]", method_name).as_str()).unwrap();
+        let mut member_signature_ = doc.select(&member_signature_cls);
+
+        while let Some(section) = member_signature_.next() {
+            if let Some(a) =
+                ARG_GENERICS.captures(section.text().collect::<Vec<&str>>().join("").as_str())
+            {
+                let args = a
+                    .get(0)
+                    .unwrap()
+                    .as_str()
+                    .to_string()
+                    .replace("(", "")
+                    .replace(")", "")
+                    .replace("\u{a0}", " ")
+                    .split(" ")
+                    .map(|f| f.to_string())
+                    .filter(|f| {
+                        !f.contains("@")
+                            && (f == "byte"
+                                || f == "short"
+                                || f == "int"
+                                || f == "long"
+                                || f == "float"
+                                || f == "double"
+                                || f == "char"
+                                || f == "boolean"
+                                || ({
+                                    if f.chars().count() >= 1 {
+                                        f.chars().nth(0).unwrap().to_uppercase().to_string()
+                                            == f.chars().nth(0).unwrap().to_string()
+                                    } else {
+                                        false
+                                    }
+                                }))
+                    })
+                    .collect::<Vec<String>>();
+                if args == wanted_args {
+                    f(doc, section);
+                }
+            }
+        }
+    }
+
     /// Get the comment block for a method
     pub fn get_method_comment<'a>(
         &self,
@@ -228,8 +286,8 @@ impl Parser {
         cls: JClass<'a>,
         module_name: String,
         method_name: String,
+        method_args: String,
     ) -> Result<String, Box<dyn Error>> {
-        let class_name = &self.class_get_name(env, &cls)?;
         let mut comment = String::new();
 
         let doc = self.get_url(&module_name, env, cls).unwrap();
@@ -237,16 +295,73 @@ impl Parser {
             return Ok("".into());
         };
         let doc = doc.unwrap();
-        let sel1 = Selector::parse(
-            format!("section[id^={}] div:not(.member-signature)", method_name).as_str(),
-        )
-        .unwrap();
-        let mut ele1 = doc.select(&sel1);
 
-        while let Some(desc) = ele1.next() {
-            comment += desc.inner_html().as_str();
-        }
+        Self::filter_method_with_args(
+            &doc,
+            &method_name,
+            method_args.split(",").collect::<Vec<&str>>(),
+            |doc, section| {
+                let sel1 = Selector::parse(format!("div:not(.member-signature)").as_str()).unwrap();
+                let mut ele1 = section.select(&sel1);
+
+                while let Some(desc) = ele1.next() {
+                    comment += desc.inner_html().as_str();
+                }
+            },
+        );
         Ok(comment)
+    }
+
+    /// Get the annotations for a method
+    pub fn get_annotations<'a>(
+        &self,
+        env: &mut JNIEnv<'a>,
+        cls: JClass<'a>,
+        module_name: String,
+        method_name: String,
+        method_args: String,
+    ) -> Result<String, Box<dyn Error>> {
+        let parsed_annotations = &self.parsed_annotations.lock();
+        let key = format!("{}{}{}", module_name, method_name, method_args);
+        if parsed_annotations.borrow().contains_key(&key) {
+            return Ok(parsed_annotations.borrow().get(&key).unwrap().clone());
+        } else {
+            let mut annotations = Vec::new();
+
+            let doc = self.get_url(&module_name, env, cls).unwrap();
+            if let None = doc {
+                return Ok("".into());
+            };
+            let doc = doc.unwrap();
+
+            Self::filter_method_with_args(
+                &doc,
+                &method_name,
+                method_args.split(",").collect::<Vec<&str>>(),
+                |doc, section| {
+                    let sel1 = Selector::parse(format!(".annotations a").as_str()).unwrap();
+                    let mut ele1 = section.select(&sel1);
+
+                    while let Some(desc) = ele1.next() {
+                        let st = desc
+                            .text()
+                            .collect::<Vec<&str>>()
+                            .join(",")
+                            .as_str()
+                            .to_string();
+                        annotations.push(format!("{}", st));
+                    }
+                },
+            );
+            let annotations = annotations.join(",");
+            if annotations != "" {
+                println!("{}", annotations);
+            }
+            parsed_annotations
+                .borrow_mut()
+                .insert(key, annotations.clone());
+            Ok(annotations)
+        }
     }
 }
 
@@ -257,6 +372,7 @@ lazy_static! {
     pub static ref PATTERN_GENERICS: Regex = Regex::new("(<|&lt;)([A-Za-z,\\s]*)(>$|>$)").unwrap();
     pub static ref METHOD_PATTERN_GENERICS: Regex =
         Regex::new("(<)([A-Za-z,\\s]*)(>$|>\\s)").unwrap();
+    pub static ref ARG_GENERICS: Regex = Regex::new("\\((.*?)\\)").unwrap();
 }
 
 static DOC_LINKS: phf::Map<&'static str, &'static str> = phf_map! {
@@ -340,8 +456,19 @@ pub fn get_method_comment<'a>(
     cls: JClass<'a>,
     module_name: String,
     method_name: String,
+    method_args: String,
 ) -> Result<String, Box<dyn Error>> {
-    PARSER.get_method_comment(env, cls, module_name, method_name)
+    PARSER.get_method_comment(env, cls, module_name, method_name, method_args)
+}
+
+pub fn get_annotations<'a>(
+    env: &mut JNIEnv<'a>,
+    cls: JClass<'a>,
+    module_name: String,
+    method_name: String,
+    method_args: String,
+) -> Result<String, Box<dyn Error>> {
+    PARSER.get_annotations(env, cls, module_name, method_name, method_args)
 }
 
 #[no_mangle]
@@ -412,6 +539,7 @@ pub extern "system" fn Java_net_ioixd_spigotjsongen_WebScraper_getMethodComment<
     module_name_raw: JString<'a>,
     cls: JClass<'a>,
     method_name_raw: JString<'a>,
+    method_args_raw: JString<'a>,
 ) -> JString<'a> {
     let module_name = env
         .get_string(&module_name_raw)
@@ -425,6 +553,43 @@ pub extern "system" fn Java_net_ioixd_spigotjsongen_WebScraper_getMethodComment<
         .to_string_lossy()
         .to_string();
 
-    let st = get_method_comment(&mut env, cls, module_name, method_name).unwrap();
+    let method_args = env
+        .get_string(&method_args_raw)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+
+    let st = get_method_comment(&mut env, cls, module_name, method_name, method_args).unwrap();
+    env.new_string(st).unwrap()
+}
+
+#[no_mangle]
+pub extern "system" fn Java_net_ioixd_spigotjsongen_WebScraper_getAnnotations<'a>(
+    mut env: JNIEnv<'a>,
+    _this: JObject,
+    module_name_raw: JString<'a>,
+    cls: JClass<'a>,
+    method_name_raw: JString<'a>,
+    method_args_raw: JString<'a>,
+) -> JString<'a> {
+    let module_name = env
+        .get_string(&module_name_raw)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+
+    let method_name = env
+        .get_string(&method_name_raw)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+
+    let method_args = env
+        .get_string(&method_args_raw)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+
+    let st = get_annotations(&mut env, cls, module_name, method_name, method_args).unwrap();
     env.new_string(st).unwrap()
 }
