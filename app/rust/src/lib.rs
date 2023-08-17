@@ -337,7 +337,10 @@ impl Parser {
             Self::filter_method_with_args(
                 &doc,
                 &method_name,
-                method_args.split(",").collect::<Vec<&str>>(),
+                method_args
+                    .split(",")
+                    .filter(|f| f != &"")
+                    .collect::<Vec<&str>>(),
                 |doc, section| {
                     let sel1 = Selector::parse(format!(".annotations a").as_str()).unwrap();
                     let mut ele1 = section.select(&sel1);
@@ -354,9 +357,6 @@ impl Parser {
                 },
             );
             let annotations = annotations.join(",");
-            if annotations != "" {
-                println!("{}", annotations);
-            }
             parsed_annotations
                 .borrow_mut()
                 .insert(key, annotations.clone());
